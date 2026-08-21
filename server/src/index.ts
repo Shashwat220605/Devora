@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import fileRoutes from "./routes/file.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
+import githubRoutes from "./routes/github.routes.js";
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use("/api", fileRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api", githubRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({
