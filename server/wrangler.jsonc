@@ -10,13 +10,5 @@
   "workers_dev": true,
   "observability": {
     "enabled": true
-  },
-  "secrets": {
-    "required": [
-      "DATABASE_URL",
-      "JWT_SECRET",
-      "GITHUB_TOKEN_ENCRYPTION_KEY",
-      "FRONTEND_URL"
-    ]
   }
 }
