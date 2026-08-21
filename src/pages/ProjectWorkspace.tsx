@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -58,7 +58,8 @@ function detectLanguage(path: string, fallback = "plaintext") {
     case "tsx":
       return "typescript";
     case "js":
-    case "jsx":n      return "javascript";
+    case "jsx":
+      return "javascript";
     case "json":
       return "json";
     case "css":
@@ -86,7 +87,7 @@ function detectLanguage(path: string, fallback = "plaintext") {
   }
 }
 
-function getFileName(path: string) {
+function fileName(path: string) {
   return path.split("/").pop() || path;
 }
 
@@ -106,63 +107,57 @@ export default function ProjectWorkspace() {
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [aiMessage, setAiMessage] = useState("");
 
-  const activeFile = useMemo(
-    () => files.find((file) => file.id === activeFileId) || null,
-    [files, activeFileId],
-  );
-
-  const loadWorkspace = async () => {
-    if (!id) {
-      navigate("/dashboard");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const [projectResponse, filesResponse] = await Promise.all([
-        api.get<Project>(`/projects/${id}`),
-        api.get<ProjectFile[]>(`/projects/${id}/files`),
-      ]);
-
-      setProject(projectResponse.data);
-
-      let loadedFiles = filesResponse.data;
-
-      if (loadedFiles.length === 0) {
-        const createdFiles: ProjectFile[] = [];
-
-        for (const starterFile of starterFiles) {
-          const response = await api.post<ProjectFile>(
-            `/projects/${id}/files`,
-            starterFile,
-          );
-          createdFiles.push(response.data);
-        }
-
-        loadedFiles = createdFiles;
-      }
-
-      setFiles(loadedFiles);
-
-      if (loadedFiles.length > 0) {
-        setActiveFileId(loadedFiles[0].id);
-        setCode(loadedFiles[0].content);
-      } else {
-        setActiveFileId(null);
-        setCode("");
-      }
-
-      setSaved(true);
-    } catch (error) {
-      console.error("Failed to load workspace:", error);
-      navigate("/dashboard");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const activeFile = files.find((file) => file.id === activeFileId) || null;
 
   useEffect(() => {
+    const loadWorkspace = async () => {
+      if (!id) {
+        navigate("/dashboard");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const [projectResponse, filesResponse] = await Promise.all([
+          api.get<Project>(`/projects/${id}`),
+          api.get<ProjectFile[]>(`/projects/${id}/files`),
+        ]);
+
+        setProject(projectResponse.data);
+
+        let loadedFiles = filesResponse.data;
+
+        if (loadedFiles.length === 0) {
+          const createdFiles: ProjectFile[] = [];
+
+          for (const starter of starterFiles) {
+            const response = await api.post<ProjectFile>(
+              `/projects/${id}/files`,
+              starter,
+            );
+            createdFiles.push(response.data);
+          }
+
+          loadedFiles = createdFiles;
+        }
+
+        setFiles(loadedFiles);
+
+        if (loadedFiles.length > 0) {
+          setActiveFileId(loadedFiles[0].id);
+          setCode(loadedFiles[0].content);
+        }
+
+        setSaved(true);
+      } catch (error) {
+        console.error("Failed to load project workspace:", error);
+        navigate("/dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     void loadWorkspace();
   }, [id, navigate]);
 
@@ -172,13 +167,8 @@ export default function ProjectWorkspace() {
     setSaved(true);
   };
 
-  const handleEditorChange = (value: string | undefined) => {
-    setCode(value ?? "");
-    setSaved(false);
-  };
-
   const saveFile = async () => {
-    if (!activeFile) {
+    if (!activeFile || !id) {
       return;
     }
 
@@ -190,8 +180,8 @@ export default function ProjectWorkspace() {
         { content: code },
       );
 
-      setFiles((currentFiles) =>
-        currentFiles.map((file) =>
+      setFiles((current) =>
+        current.map((file) =>
           file.id === activeFile.id ? response.data : file,
         ),
       );
@@ -217,14 +207,13 @@ export default function ProjectWorkspace() {
         { path, content: "" },
       );
 
-      setFiles((currentFiles) => [...currentFiles, response.data]);
+      setFiles((current) => [...current, response.data]);
       setActiveFileId(response.data.id);
       setCode("");
       setSaved(true);
       setNewFilePath("");
       setCreatingFile(false);
     } catch (error: any) {
-      console.error("Failed to create file:", error);
       window.alert(
         error.response?.data?.message || "Failed to create file.",
       );
@@ -232,11 +221,7 @@ export default function ProjectWorkspace() {
   };
 
   const deleteFile = async (file: ProjectFile) => {
-    if (!id) {
-      return;
-    }
-
-    if (!window.confirm(`Delete ${file.path}? This cannot be undone.`)) {
+    if (!id || !window.confirm(`Delete ${file.path}? This cannot be undone.`)) {
       return;
     }
 
@@ -244,13 +229,13 @@ export default function ProjectWorkspace() {
       setDeletingFileId(file.id);
       await api.delete(`/projects/${id}/files/${file.id}`);
 
-      const remainingFiles = files.filter((item) => item.id !== file.id);
-      setFiles(remainingFiles);
+      const remaining = files.filter((item) => item.id !== file.id);
+      setFiles(remaining);
 
       if (activeFileId === file.id) {
-        const nextFile = remainingFiles[0];
-        setActiveFileId(nextFile?.id ?? null);
-        setCode(nextFile?.content ?? "");
+        const next = remaining[0] || null;
+        setActiveFileId(next?.id ?? null);
+        setCode(next?.content ?? "");
         setSaved(true);
       }
     } catch (error) {
@@ -275,7 +260,7 @@ export default function ProjectWorkspace() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#09090b] text-white">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0f0f12] px-4">
-        <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             onClick={() => navigate("/dashboard")}
             className="rounded-lg p-2 text-zinc-500 hover:bg-white/[0.05] hover:text-white"
@@ -283,17 +268,15 @@ export default function ProjectWorkspace() {
             <ArrowLeft size={18} />
           </button>
 
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-black">
-              <Code2 size={16} />
-            </div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-black">
+            <Code2 size={16} />
+          </div>
 
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{project.name}</p>
-              <p className="text-[11px] text-zinc-500">
-                {project.language || "Development project"}
-              </p>
-            </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{project.name}</p>
+            <p className="text-[11px] text-zinc-500">
+              {project.language || "Development project"}
+            </p>
           </div>
         </div>
 
@@ -329,10 +312,7 @@ export default function ProjectWorkspace() {
             </span>
 
             <div className="flex items-center gap-1">
-              <span className="mr-1 text-xs text-zinc-700">
-                {files.length}
-              </span>
-
+              <span className="mr-1 text-xs text-zinc-700">{files.length}</span>
               <button
                 onClick={() => setCreatingFile(true)}
                 className="rounded-md p-1.5 text-zinc-600 hover:bg-white/[0.05] hover:text-white"
@@ -428,7 +408,7 @@ export default function ProjectWorkspace() {
               {activeFile && (
                 <div className="flex h-full max-w-xs items-center gap-2 border-r border-white/10 bg-[#09090b] px-4 text-xs text-zinc-300">
                   <FileCode2 size={14} />
-                  <span className="truncate">{getFileName(activeFile.path)}</span>
+                  <span className="truncate">{fileName(activeFile.path)}</span>
                   {!saved && <span className="text-zinc-500">●</span>}
                 </div>
               )}
@@ -444,12 +424,12 @@ export default function ProjectWorkspace() {
               <Editor
                 height="100%"
                 theme="vs-dark"
-                language={detectLanguage(
-                  activeFile.path,
-                  activeFile.language || "plaintext",
-                )}
+                language={detectLanguage(activeFile.path, activeFile.language || "plaintext")}
                 value={code}
-                onChange={handleEditorChange}
+                onChange={(value) => {
+                  setCode(value ?? "");
+                  setSaved(false);
+                }}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 14,
@@ -550,7 +530,11 @@ export default function ProjectWorkspace() {
           </span>
         </div>
 
-        <span>{activeFile ? detectLanguage(activeFile.path, activeFile.language || "plaintext") : "No file"}</span>
+        <span>
+          {activeFile
+            ? detectLanguage(activeFile.path, activeFile.language || "plaintext")
+            : "No file"}
+        </span>
       </footer>
     </div>
   );
