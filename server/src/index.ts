@@ -1,34 +1,7 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import fileRoutes from "./routes/file.routes.js";
-import authRoutes from "./routes/auth.routes.js";
-import projectRoutes from "./routes/project.routes.js";
-import githubRoutes from "./routes/github.routes.js";
-import githubDiffRoutes from "./routes/github-diff.routes.js";
-import githubSyncRoutes from "./routes/github-sync.routes.js";
+import "dotenv/config";
+import app from "./app.js";
 
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-app.use(cors());
-app.use(express.json());
-
-app.use("/api", fileRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/projects", projectRoutes);
-app.use("/api", githubRoutes);
-app.use("/api", githubDiffRoutes);
-app.use("/api", githubSyncRoutes);
-
-app.get("/api/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    message: "Devora backend is running",
-  });
-});
+const PORT = Number(process.env.PORT || 5000);
 
 app.listen(PORT, () => {
   console.log(
