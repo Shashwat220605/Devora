@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, Check, Copy, ExternalLink, GitBranch, Play, RotateCcw, Settings, Terminal as TerminalIcon } from "lucide-react";
+import { Bot, Check, GitBranch, RotateCcw, Settings, Terminal as TerminalIcon } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
 
