@@ -9,11 +9,46 @@ import githubSyncRoutes from "./routes/github-sync.routes.js";
 
 const app = express();
 
-const allowedOrigin = process.env.FRONTEND_URL;
+const configuredFrontendOrigin = process.env.FRONTEND_URL;
+
+const isAllowedOrigin = (origin?: string) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (origin === configuredFrontendOrigin) {
+    return true;
+  }
+
+  if (origin === "http://localhost:5173") {
+    return true;
+  }
+
+  try {
+    const url = new URL(origin);
+
+    return (
+      url.protocol === "https:" &&
+      url.hostname.endsWith(".vercel.app") &&
+      url.hostname.startsWith("devora-")
+    );
+  } catch {
+    return false;
+  }
+};
 
 app.use(
   cors({
-    origin: allowedOrigin || true,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(
+        new Error("Origin is not allowed by Devora CORS policy"),
+      );
+    },
     credentials: true,
   }),
 );
