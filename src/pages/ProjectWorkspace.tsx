@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Bot,
   Check,
-  ChevronDown,
   Code2,
   File,
   FileCode2,
   Folder,
   GitBranch,
+  Github,
   Play,
   Plus,
   Save,
@@ -39,14 +39,26 @@ interface ProjectFile {
   updatedAt: string;
 }
 
+interface ImportResult {
+  message: string;
+  repository: {
+    name: string;
+    url: string;
+    branch: string;
+  };
+  filesImported: number;
+}
+
 const starterFiles = [
   {
     path: "README.md",
-    content: "# Welcome to Devora\n\nStart building your project here.\n",
+    content:
+      "# Welcome to Devora\n\nStart building your project here.\n",
   },
   {
     path: "src/index.ts",
-    content: 'const message = "Welcome to Devora";\n\nconsole.log(message);\n',
+    content:
+      'const message = "Welcome to Devora";\n\nconsole.log(message);\n',
   },
 ];
 
@@ -87,7 +99,7 @@ function detectLanguage(path: string, fallback = "plaintext") {
   }
 }
 
-function fileName(path: string) {
+function getFileName(path: string) {
   return path.split("/").pop() || path;
 }
 
@@ -102,12 +114,23 @@ export default function ProjectWorkspace() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(true);
+
   const [creatingFile, setCreatingFile] = useState(false);
   const [newFilePath, setNewFilePath] = useState("");
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+
+  const [showGithubImport, setShowGithubImport] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
   const [aiMessage, setAiMessage] = useState("");
 
-  const activeFile = files.find((file) => file.id === activeFileId) || null;
+  const activeFile = useMemo(
+    () => files.find((file) => file.id === activeFileId) || null,
+    [files, activeFileId],
+  );
 
   useEffect(() => {
     const loadWorkspace = async () => {
@@ -168,9 +191,7 @@ export default function ProjectWorkspace() {
   };
 
   const saveFile = async () => {
-    if (!activeFile || !id) {
-      return;
-    }
+    if (!activeFile || !id) return;
 
     try {
       setSaving(true);
@@ -197,9 +218,7 @@ export default function ProjectWorkspace() {
   const createFile = async () => {
     const path = newFilePath.trim();
 
-    if (!id || !path) {
-      return;
-    }
+    if (!id || !path) return;
 
     try {
       const response = await api.post<ProjectFile>(
@@ -245,6 +264,45 @@ export default function ProjectWorkspace() {
     }
   };
 
+  const importGithubRepository = async () => {
+    if (!id || !githubUrl.trim()) return;
+
+    try {
+      setImporting(true);
+      setImportError("");
+      setImportResult(null);
+
+      const response = await api.post<ImportResult>("/github/import", {
+        projectId: id,
+        repositoryUrl: githubUrl.trim(),
+      });
+
+      const refreshed = await api.get<ProjectFile[]>(
+        `/projects/${id}/files`,
+      );
+
+      setFiles(refreshed.data);
+
+      if (refreshed.data.length > 0) {
+        const first = refreshed.data[0];
+        setActiveFileId(first.id);
+        setCode(first.content);
+      }
+
+      setSaved(true);
+      setImportResult(response.data);
+      setGithubUrl("");
+    } catch (error: any) {
+      console.error("GitHub import failed:", error);
+      setImportError(
+        error.response?.data?.message ||
+          "Unable to import the GitHub repository.",
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#09090b] text-zinc-500">
@@ -253,9 +311,7 @@ export default function ProjectWorkspace() {
     );
   }
 
-  if (!project) {
-    return null;
-  }
+  if (!project) return null;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#09090b] text-white">
@@ -281,7 +337,19 @@ export default function ProjectWorkspace() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden text-xs text-zinc-600 sm:block">
+          <button
+            onClick={() => {
+              setShowGithubImport(true);
+              setImportError("");
+              setImportResult(null);
+            }}
+            className="hidden items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/[0.05] sm:flex"
+          >
+            <Github size={14} />
+            Import GitHub
+          </button>
+
+          <span className="hidden text-xs text-zinc-600 lg:block">
             {saving ? "Saving..." : saved ? "Saved" : "Unsaved changes"}
           </span>
 
@@ -363,12 +431,11 @@ export default function ProjectWorkspace() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             <div className="flex items-center gap-2 rounded-md px-2 py-2 text-xs text-zinc-400">
-              <ChevronDown size={13} />
               <Folder size={14} />
               <span className="truncate">{project.name}</span>
             </div>
 
-            <div className="ml-5 mt-1 space-y-1">
+            <div className="mt-1 space-y-1">
               {files.map((file) => (
                 <div
                   key={file.id}
@@ -378,7 +445,7 @@ export default function ProjectWorkspace() {
                 >
                   <button
                     onClick={() => openFile(file)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-xs ${
+                    className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs ${
                       activeFileId === file.id
                         ? "text-white"
                         : "text-zinc-500 hover:text-zinc-300"
@@ -408,7 +475,7 @@ export default function ProjectWorkspace() {
               {activeFile && (
                 <div className="flex h-full max-w-xs items-center gap-2 border-r border-white/10 bg-[#09090b] px-4 text-xs text-zinc-300">
                   <FileCode2 size={14} />
-                  <span className="truncate">{fileName(activeFile.path)}</span>
+                  <span className="truncate">{getFileName(activeFile.path)}</span>
                   {!saved && <span className="text-zinc-500">●</span>}
                 </div>
               )}
@@ -424,7 +491,10 @@ export default function ProjectWorkspace() {
               <Editor
                 height="100%"
                 theme="vs-dark"
-                language={detectLanguage(activeFile.path, activeFile.language || "plaintext")}
+                language={detectLanguage(
+                  activeFile.path,
+                  activeFile.language || "plaintext",
+                )}
                 value={code}
                 onChange={(value) => {
                   setCode(value ?? "");
@@ -476,22 +546,26 @@ export default function ProjectWorkspace() {
                 </div>
 
                 <div className="rounded-xl bg-white/[0.05] p-3 text-xs leading-5 text-zinc-400">
-                  I&apos;m ready to help with <span className="text-white">{project.name}</span>.
+                  I&apos;m ready to help with{" "}
+                  <span className="text-white">{project.name}</span>.
                 </div>
               </div>
 
               <div className="mt-5 grid gap-2">
-                {["Explain this file", "Find potential bugs", "Write tests", "Improve this code"].map(
-                  (prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => setAiMessage(prompt)}
-                      className="rounded-lg border border-white/10 px-3 py-2 text-left text-xs text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
-                    >
-                      {prompt}
-                    </button>
-                  ),
-                )}
+                {[
+                  "Explain this file",
+                  "Find potential bugs",
+                  "Write tests",
+                  "Improve this code",
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => setAiMessage(prompt)}
+                    className="rounded-lg border border-white/10 px-3 py-2 text-left text-xs text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
+                  >
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -523,19 +597,88 @@ export default function ProjectWorkspace() {
             <GitBranch size={10} />
             main
           </span>
-
           <span className="flex items-center gap-1">
             <Check size={10} />
             Devora ready
           </span>
         </div>
-
-        <span>
-          {activeFile
-            ? detectLanguage(activeFile.path, activeFile.language || "plaintext")
-            : "No file"}
-        </span>
+        <span>{activeFile ? detectLanguage(activeFile.path) : "No file"}</span>
       </footer>
+
+      {showGithubImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#101014] p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Github size={18} />
+                  <h3 className="text-xl font-semibold">Import GitHub repository</h3>
+                </div>
+                <p className="mt-2 text-sm text-zinc-500">
+                  Import a public GitHub repository into this Devora project.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowGithubImport(false)}
+                className="rounded-lg p-2 text-zinc-500 hover:bg-white/[0.05] hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <label className="mb-2 block text-sm text-zinc-400">
+                Repository URL
+              </label>
+              <input
+                value={githubUrl}
+                onChange={(event) => setGithubUrl(event.target.value)}
+                placeholder="https://github.com/owner/repository"
+                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none placeholder:text-zinc-700 focus:border-white/20"
+              />
+              <p className="mt-2 text-xs text-zinc-600">
+                Public repositories only for this first GitHub integration.
+              </p>
+            </div>
+
+            {importError && (
+              <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                {importError}
+              </div>
+            )}
+
+            {importResult && (
+              <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">
+                Imported {importResult.filesImported} files from{" "}
+                <strong>{importResult.repository.name}</strong> on branch{" "}
+                <strong>{importResult.repository.branch}</strong>.
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowGithubImport(false)}
+                className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm text-zinc-400 hover:bg-white/[0.05] hover:text-white"
+              >
+                Close
+              </button>
+
+              <button
+                onClick={() => void importGithubRepository()}
+                disabled={importing || !githubUrl.trim()}
+                className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-medium text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {importing ? "Importing..." : "Import repository"}
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs text-zinc-700">
+              GitHub authentication for private repositories will be added next.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
