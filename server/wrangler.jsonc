@@ -8,6 +8,12 @@
     "nodejs_compat_populate_process_env"
   ],
   "workers_dev": true,
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "4e36ec94faeb49eda9b5609f3934858"
+    }
+  ],
   "observability": {
     "enabled": true
   }
