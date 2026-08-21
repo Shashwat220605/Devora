@@ -9,8 +9,12 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not defined");
 }
 
-// Node needs a WebSocket constructor for local development.
-// Cloudflare Workers already provides WebSocket globally.
+// Cloudflare Workers can use Neon's HTTP transport, which avoids relying
+// on a long-lived outbound WebSocket connection for database queries.
+neonConfig.poolQueryViaFetch = true;
+
+// Node/local development still needs a WebSocket implementation when
+// the Neon driver falls back to WebSocket transport.
 if (typeof globalThis.WebSocket === "undefined") {
   neonConfig.webSocketConstructor = ws;
 }
