@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "devora-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "secrets": {
+    "required": [
+      "DATABASE_URL",
+      "JWT_SECRET",
+      "GITHUB_TOKEN_ENCRYPTION_KEY",
+      "FRONTEND_URL"
+    ]
+  }
+}
