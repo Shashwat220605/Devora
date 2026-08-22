@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, Check, GitBranch, RotateCcw, Settings, Terminal as TerminalIcon } from "lucide-react";
+import { Bot, Check, GitBranch, RotateCcw, Settings } from "lucide-react";
 import Layout from "./Layout";
+import TerminalWorkspace from "./TerminalPage";
 import api from "../services/api";
 
 interface Project { id: string; name: string; description: string | null; }
@@ -32,10 +33,7 @@ export function GitHubPage() {
 }
 
 export function TerminalPage() {
-  const [command, setCommand] = useState("");
-  const [history, setHistory] = useState<string[]>(["Devora terminal ready.", "This UI shell is safe to use while secure execution is being added."]);
-  const run = () => { const value = command.trim(); if (!value) return; const output = value === "help" ? "Available: help, clear, pwd, ls, echo <text>" : value === "pwd" ? "/devora/workspace" : value === "ls" ? "projects/  README.md" : value === "clear" ? "" : value.startsWith("echo ") ? value.slice(5) : `Command queued: ${value}`; setHistory((current) => value === "clear" ? [] : [...current, `$ ${value}`, output]); setCommand(""); };
-  return <Layout active="Terminal"><ToolHeader title="Terminal" description="A safe terminal interface for workspace commands. Real code execution can be connected later." /><section className="p-5 sm:p-8"><div className="overflow-hidden rounded-2xl border border-white/10 bg-black"><div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-xs text-zinc-500"><TerminalIcon size={14} /> devora-terminal</div><div className="min-h-[420px] p-4 font-mono text-xs text-zinc-400">{history.map((line, index) => <div key={index} className={line.startsWith("$") ? "mt-2 text-white" : "mt-1"}>{line || "\u00a0"}</div>)}<div className="mt-3 flex gap-2"><span>$</span><input value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") run(); }} autoFocus className="min-w-0 flex-1 bg-transparent outline-none text-white" /></div></div></div></section></Layout>;
+  return <TerminalWorkspace />;
 }
 
 export function ActivityPage() {
