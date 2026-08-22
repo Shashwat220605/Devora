@@ -4,7 +4,6 @@ import {
   Check,
   ExternalLink,
   GitBranch,
-  Github,
   Loader2,
   LogOut,
   RefreshCw,
@@ -229,7 +228,7 @@ export default function GitHubHubFinal() {
           <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-[#0f0f12] p-6">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-black">
-                <Github size={24} />
+                <GitBranch size={24} />
               </div>
 
               <div>
@@ -260,7 +259,7 @@ export default function GitHubHubFinal() {
               {busy ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Github size={16} />
+                <GitBranch size={16} />
               )}
               Continue with GitHub
             </button>
