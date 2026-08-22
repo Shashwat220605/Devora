@@ -30,13 +30,18 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem("devora_user") || "null") as User | null;
 
   const loadProjects = async () => {
-    try { setLoading(true); setError(""); const response = await api.get<Project[]>("/projects"); setProjects(response.data); }
-    catch (err: any) {
-      const message = err.response?.data?.message;
+    try {
+      setLoading(true);
+      setError("");
+      const response = await api.get<Project[]>("/projects");
+      setProjects(response.data);
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Failed to load your projects.";
       const detail = err.response?.data?.detail;
-      setError(detail ? `${message || "Failed to load your projects."} | ${detail}` : (message || "Failed to load your projects."));
+      setError(detail ? `${message} ${detail}` : message);
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
   };
 
   useEffect(() => { void loadProjects(); }, []);
