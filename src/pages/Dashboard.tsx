@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { ChevronRight, FolderGit2, GitBranch, Plus, Sparkles, Trash2 } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
@@ -64,7 +65,7 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [language, setLanguage] = useState("");
+  const [language, setLanguage] = useState(localStorage.getItem("devora_default_language") || "");
   const [templateLabel, setTemplateLabel] = useState("Blank");
   const user = JSON.parse(localStorage.getItem("devora_user") || "null") as User | null;
 
@@ -93,7 +94,7 @@ export default function Dashboard() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   }, [projects]);
 
-  const createProject = async (event: React.FormEvent<HTMLFormElement>) => {
+  const createProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim()) return;
     try {
@@ -113,7 +114,7 @@ export default function Dashboard() {
         }
       }
       setProjects((current) => [response.data, ...current]);
-      setName(""); setDescription(""); setLanguage(""); setTemplateLabel("Blank"); setShowModal(false);
+      setName(""); setDescription(""); setLanguage(localStorage.getItem("devora_default_language") || ""); setTemplateLabel("Blank"); setShowModal(false);
       if (createdFiles) setError("");
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to create project.");
@@ -129,7 +130,7 @@ export default function Dashboard() {
   };
 
   const deleteProject = async (id: string) => {
-    if (!window.confirm("Delete this project? This cannot be undone.")) return;
+    if (localStorage.getItem("devora_confirm_delete") !== "0" && !window.confirm("Delete this project? This cannot be undone.")) return;
     try {
       setDeletingId(id);
       setError("");
@@ -190,7 +191,7 @@ export default function Dashboard() {
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {templates.map((template) => <button key={template.label} type="button" onClick={() => selectTemplate(template.label)} className={`rounded-xl border p-4 text-left transition ${templateLabel === template.label ? "border-white/30 bg-white/[0.08]" : "border-white/10 hover:bg-white/[0.04]"}`}><div className="flex items-center justify-between gap-3"><span className="font-medium">{template.label}</span>{templateLabel === template.label && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-black">Selected</span>}</div><p className="mt-1 text-xs text-zinc-500">{template.description}</p><p className="mt-3 text-[10px] text-zinc-700">{template.files.length} starter files</p></button>)}
         </div>
-        <form onSubmit={createProject} className="mt-6 space-y-4"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" required className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none" /><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={3} className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none" /><select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full rounded-xl border border-white/10 bg-[#101014] px-4 py-3 text-sm outline-none"><option value="">Use template language</option>{["TypeScript","JavaScript","Python","Java","C++","C","C#","Go","Rust","HTML"].map((item) => <option key={item} value={item}>{item}</option>)}</select><div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm text-zinc-400 hover:text-white">Cancel</button><button type="submit" disabled={creating} className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-medium text-black disabled:opacity-50">{creating ? "Creating workspace..." : `Create ${selectedTemplate.label}`}</button></div></form>
+        <form onSubmit={createProject} className="mt-6 space-y-4"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" required className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none" /><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={3} className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none" /><select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full rounded-xl border border-white/10 bg-[#101014] px-4 py-3 text-sm outline-none"><option value="">Use template/default language</option>{["TypeScript","JavaScript","Python","Java","C++","C","C#","Go","Rust","HTML"].map((item) => <option key={item} value={item}>{item}</option>)}</select><div className="flex gap-3 pt-2"><button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm text-zinc-400 hover:text-white">Cancel</button><button type="submit" disabled={creating} className="flex-1 rounded-xl bg-white px-4 py-3 text-sm font-medium text-black disabled:opacity-50">{creating ? "Creating workspace..." : `Create ${selectedTemplate.label}`}</button></div></form>
       </div></div>}
     </Layout>
   );
