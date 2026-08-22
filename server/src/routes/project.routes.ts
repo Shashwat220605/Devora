@@ -1,5 +1,5 @@
 import { Router } from "express";
-import prisma from "../lib/prisma.js";
+import { getPrisma } from "../lib/prisma.js";
 import {
   authenticate,
   type AuthenticatedRequest,
@@ -7,22 +7,81 @@ import {
 
 const router = Router();
 
-// Get current user's projects
+function userIdFrom(req: AuthenticatedRequest) {
+  return req.userId;
+}
+
 router.get("/", authenticate, async (req, res) => {
   try {
-    const userId = (req as AuthenticatedRequest).userId;
+    const userId = userIdFrom(req as AuthenticatedRequest);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
 
-    if (!userId) {
-      return res.status(401).json({
-        message: "Authentication required",
-      });
+    const prisma = getPrisma();
+    const projects = await prisma.project.findMany({
+      where: { ownerId: userId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        language: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return res.json(projects);
+  } catch (error) {
+    console.error("GET /projects error:", error);
+    const detail = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ message: "Failed to fetch projects", detail });
+  }
+});
+
+router.get("/:id", authenticate, async (req, res) => {
+  try {
+    const userId = userIdFrom(req as AuthenticatedRequest);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+
+    const prisma = getPrisma();
+    const projectId = String(req.params.id);
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, ownerId: userId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        language: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    return res.json(project);
+  } catch (error) {
+    console.error("GET /projects/:id error:", error);
+    const detail = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ message: "Failed to fetch project", detail });
+  }
+});
+
+router.post("/", authenticate, async (req, res) => {
+  try {
+    const userId = userIdFrom(req as AuthenticatedRequest);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+
+    const { name, description, language } = req.body;
+    if (typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ message: "Project name is required" });
     }
 
-    // Keep this query deliberately small for the Workers runtime.
-    // Avoid relation loading and sorting so a stale/partial database schema
-    // cannot break the project list endpoint.
-    const projects = await prisma.project.findMany({
-      where: {
+    const prisma = getPrisma();
+    const project = await prisma.project.create({
+      data: {
+        name: name.trim(),
+        description: typeof description === "string" && description.trim() ? description.trim() : null,
+        language: typeof language === "string" && language.trim() ? language.trim() : null,
         ownerId: userId,
       },
       select: {
@@ -35,146 +94,34 @@ router.get("/", authenticate, async (req, res) => {
       },
     });
 
-    return res.json(projects);
-  } catch (error) {
-    console.error("GET /projects error:", error);
-
-    const detail = error instanceof Error ? error.message : String(error);
-
-    return res.status(500).json({
-      message: "Failed to fetch projects",
-      detail,
-    });
-  }
-});
-
-// Get one current user's project
-router.get("/:id", authenticate, async (req, res) => {
-  try {
-    const userId = (req as AuthenticatedRequest).userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Authentication required",
-      });
-    }
-
-    const projectId = String(req.params.id);
-
-    const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        ownerId: userId,
-      },
-      include: {
-        repositories: true,
-        tasks: true,
-        conversations: true,
-        activities: true,
-      },
-    });
-
-    if (!project) {
-      return res.status(404).json({
-        message: "Project not found",
-      });
-    }
-
-    return res.json(project);
-  } catch (error) {
-    console.error("GET /projects/:id error:", error);
-
-    return res.status(500).json({
-      message: "Failed to fetch project",
-    });
-  }
-});
-
-// Create project for logged-in user
-router.post("/", authenticate, async (req, res) => {
-  try {
-    const userId = (req as AuthenticatedRequest).userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Authentication required",
-      });
-    }
-
-    const { name, description, language } = req.body;
-
-    if (typeof name !== "string" || !name.trim()) {
-      return res.status(400).json({
-        message: "Project name is required",
-      });
-    }
-
-    const project = await prisma.project.create({
-      data: {
-        name: name.trim(),
-        description:
-          typeof description === "string" && description.trim()
-            ? description.trim()
-            : null,
-        language:
-          typeof language === "string" && language.trim()
-            ? language.trim()
-            : null,
-        ownerId: userId,
-      },
-    });
-
     return res.status(201).json(project);
   } catch (error) {
     console.error("POST /projects error:", error);
-
-    return res.status(500).json({
-      message: "Failed to create project",
-    });
+    const detail = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ message: "Failed to create project", detail });
   }
 });
 
-// Delete current user's project
 router.delete("/:id", authenticate, async (req, res) => {
   try {
-    const userId = (req as AuthenticatedRequest).userId;
+    const userId = userIdFrom(req as AuthenticatedRequest);
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
 
-    if (!userId) {
-      return res.status(401).json({
-        message: "Authentication required",
-      });
-    }
-
+    const prisma = getPrisma();
     const projectId = String(req.params.id);
-
     const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        ownerId: userId,
-      },
+      where: { id: projectId, ownerId: userId },
+      select: { id: true },
     });
 
-    if (!project) {
-      return res.status(404).json({
-        message: "Project not found",
-      });
-    }
+    if (!project) return res.status(404).json({ message: "Project not found" });
 
-    await prisma.project.delete({
-      where: {
-        id: projectId,
-      },
-    });
-
-    return res.json({
-      message: "Project deleted successfully",
-    });
+    await prisma.project.delete({ where: { id: projectId } });
+    return res.json({ message: "Project deleted successfully" });
   } catch (error) {
     console.error("DELETE /projects/:id error:", error);
-
-    return res.status(500).json({
-      message: "Failed to delete project",
-    });
+    const detail = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ message: "Failed to delete project", detail });
   }
 });
 
