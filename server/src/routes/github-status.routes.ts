@@ -1,6 +1,5 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { getPrisma } from "../lib/prisma.js";
 import {
   authenticate,
   type AuthenticatedRequest,
@@ -44,17 +43,8 @@ router.get("/github/status", authenticate, async (req, res) => {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    const prisma = getPrisma();
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        githubUsername: true,
-        githubTokenEnc: true,
-      },
-    });
-
     let oauthUrl: string | null = null;
-    if (!user?.githubTokenEnc && OAUTH_CLIENT_ID && JWT_SECRET) {
+    if (OAUTH_CLIENT_ID && JWT_SECRET) {
       const state = createOAuthState(userId);
       const params = new URLSearchParams({
         client_id: OAUTH_CLIENT_ID,
@@ -65,9 +55,11 @@ router.get("/github/status", authenticate, async (req, res) => {
       oauthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
     }
 
+    // Keep this endpoint lightweight. The OAuth start path must not depend on
+    // a database round-trip just to open GitHub's authorization screen.
     return res.json({
-      connected: Boolean(user?.githubTokenEnc),
-      username: user?.githubUsername || null,
+      connected: false,
+      username: null,
       oauthUrl,
     });
   } catch (error) {
