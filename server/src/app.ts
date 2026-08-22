@@ -56,6 +56,7 @@ app.use("/api", githubRoutes);
 app.use("/api", githubRepoRoutes);
 app.use("/api", githubOAuthRoutes);
 app.use("/api", githubOAuthUrlRoutes);
+// OAuth start endpoint: POST /api/github/oauth/begin
 app.use("/api", githubOAuthBeginRoutes);
 app.use("/api", githubDiffRoutes);
 app.use("/api", githubSyncRoutes);
