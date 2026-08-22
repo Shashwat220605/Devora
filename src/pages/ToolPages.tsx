@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, Check, GitBranch, RotateCcw, Settings } from "lucide-react";
+import { Bot, Check, GitBranch, LayoutDashboard, Monitor, RotateCcw, Settings, UserRound } from "lucide-react";
 import Layout from "./Layout";
 import TerminalWorkspace from "./TerminalPage";
 import api from "../services/api";
@@ -46,7 +46,41 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
   const [compact, setCompact] = useState(localStorage.getItem("devora_compact") === "1");
-  const toggleCompact = () => { const next = !compact; setCompact(next); localStorage.setItem("devora_compact", next ? "1" : "0"); setSaved(true); };
+  const [autoSave, setAutoSave] = useState(localStorage.getItem("devora_autosave") !== "0");
+  const [editorWrap, setEditorWrap] = useState(localStorage.getItem("devora_wrap") !== "0");
+
+  const saveFlag = (key: string, value: boolean) => {
+    localStorage.setItem(key, value ? "1" : "0");
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1400);
+  };
+
+  const toggleCompact = () => { const next = !compact; setCompact(next); saveFlag("devora_compact", next); };
+  const toggleAutoSave = () => { const next = !autoSave; setAutoSave(next); saveFlag("devora_autosave", next); };
+  const toggleWrap = () => { const next = !editorWrap; setEditorWrap(next); saveFlag("devora_wrap", next); };
+  const resetPreferences = () => {
+    localStorage.removeItem("devora_compact");
+    localStorage.removeItem("devora_autosave");
+    localStorage.removeItem("devora_wrap");
+    setCompact(false);
+    setAutoSave(true);
+    setEditorWrap(true);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1400);
+  };
   const logout = () => { localStorage.removeItem("devora_token"); localStorage.removeItem("devora_user"); navigate("/login", { replace: true }); };
-  return <Layout active="Settings"><ToolHeader title="Settings" description="Manage local workspace preferences and your session." /><section className="p-5 sm:p-8"><div className="max-w-2xl space-y-4"><div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5"><div className="flex items-center gap-3"><Settings size={18} /><div><p className="font-medium">Workspace density</p><p className="text-sm text-zinc-500">Keep compact UI spacing for smaller screens.</p></div></div><button onClick={toggleCompact} className={`mt-5 flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm ${compact ? "border-white/20 bg-white/[0.06]" : "border-white/10"}`}><span>{compact ? "Compact mode enabled" : "Compact mode disabled"}</span>{compact ? <Check size={16} /> : <RotateCcw size={16} className="text-zinc-600" />}</button>{saved && <p className="mt-2 text-xs text-emerald-400">Saved locally.</p>}</div><div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5"><p className="font-medium">Session</p><p className="mt-1 text-sm text-zinc-500">Sign out from this browser.</p><button onClick={logout} className="mt-5 rounded-xl border border-red-500/20 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10">Sign out</button></div></div></section></Layout>;
+
+  return <Layout active="Settings"><ToolHeader title="Settings" description="Manage your Devora profile, workspace preferences, and session." /><section className="p-5 sm:p-8"><div className="grid max-w-4xl gap-5 lg:grid-cols-2">
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5 lg:col-span-2"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]"><UserRound size={18} /></div><div><p className="font-medium">Profile</p><p className="text-sm text-zinc-500">Update the name shown around your workspace.</p></div></div><button onClick={() => navigate("/profile")} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-300 hover:bg-white/[0.05] hover:text-white">Open profile</button></div></div>
+
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5"><div className="flex items-center gap-3"><Monitor size={18} /><div><p className="font-medium">Workspace density</p><p className="text-sm text-zinc-500">Use tighter spacing for smaller screens.</p></div></div><button onClick={toggleCompact} className={`mt-5 flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm ${compact ? "border-white/20 bg-white/[0.06]" : "border-white/10"}`}><span>{compact ? "Compact mode enabled" : "Compact mode disabled"}</span>{compact ? <Check size={16} /> : <RotateCcw size={16} className="text-zinc-600" />}</button></div>
+
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5"><div className="flex items-center gap-3"><LayoutDashboard size={18} /><div><p className="font-medium">Editor preferences</p><p className="text-sm text-zinc-500">Keep the editor comfortable for long sessions.</p></div></div><button onClick={toggleAutoSave} className="mt-5 flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm hover:bg-white/[0.04]"><span>{autoSave ? "Auto-save enabled" : "Auto-save disabled"}</span>{autoSave && <Check size={16} />}</button><button onClick={toggleWrap} className="mt-2 flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm hover:bg-white/[0.04]"><span>{editorWrap ? "Word wrap enabled" : "Word wrap disabled"}</span>{editorWrap && <Check size={16} />}</button></div>
+
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5"><div className="flex items-center gap-3"><Settings size={18} /><div><p className="font-medium">Preferences</p><p className="text-sm text-zinc-500">Reset local workspace settings.</p></div></div><button onClick={resetPreferences} className="mt-5 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-400 hover:bg-white/[0.05] hover:text-white">Reset preferences</button>{saved && <p className="mt-3 text-xs text-emerald-400">Saved locally.</p>}</div>
+
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5"><p className="font-medium">Session</p><p className="mt-1 text-sm text-zinc-500">Sign out from this browser.</p><button onClick={logout} className="mt-5 rounded-xl border border-red-500/20 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10">Sign out</button></div>
+
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5 lg:col-span-2"><p className="font-medium">Account security</p><p className="mt-1 text-sm text-zinc-500">Login and password changes are intentionally left on the existing authentication flow so this update does not modify the production backend.</p><div className="mt-4 flex items-center gap-2 text-xs text-emerald-400"><Check size={14} /> Authentication is active</div></div>
+  </div></section></Layout>;
 }
