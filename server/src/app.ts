@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import githubRoutes from "./routes/github.routes.js";
 import githubRepoRoutes from "./routes/github-repo.routes.js";
+import githubOAuthRoutes from "./routes/github-oauth.routes.js";
 import githubDiffRoutes from "./routes/github-diff.routes.js";
 import githubSyncRoutes from "./routes/github-sync.routes.js";
 
@@ -49,6 +50,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api", githubRoutes);
 app.use("/api", githubRepoRoutes);
+app.use("/api", githubOAuthRoutes);
 app.use("/api", githubDiffRoutes);
 app.use("/api", githubSyncRoutes);
 
