@@ -76,11 +76,7 @@ export default function GitHubHubFinal() {
   const connect = async () => {
     try {
       setBusy(true); setError("");
-      const response = await api.post<{ url: string }>(
-        `/github/oauth/begin?cb=${Date.now()}`,
-        {},
-        { headers: { "Cache-Control": "no-cache" } },
-      );
+      const response = await api.post<{ url: string }>(`/github/oauth/begin?cb=${Date.now()}`);
       window.location.href = response.data.url;
     } catch (err: any) {
       setError(err.response?.data?.message || "Unable to start GitHub authorization.");
