@@ -9,6 +9,7 @@ import githubRepoRoutes from "./routes/github-repo.routes.js";
 import githubOAuthRoutes from "./routes/github-oauth.routes.js";
 import githubOAuthUrlRoutes from "./routes/github-oauth-url.routes.js";
 import githubOAuthBeginRoutes from "./routes/github-oauth-begin.routes.js";
+import githubWorkspaceRoutes from "./routes/github-workspace.routes.js";
 import githubDiffRoutes from "./routes/github-diff.routes.js";
 import githubSyncRoutes from "./routes/github-sync.routes.js";
 
@@ -56,8 +57,8 @@ app.use("/api", githubRoutes);
 app.use("/api", githubRepoRoutes);
 app.use("/api", githubOAuthRoutes);
 app.use("/api", githubOAuthUrlRoutes);
-// OAuth start endpoint: POST /api/github/oauth/begin
 app.use("/api", githubOAuthBeginRoutes);
+app.use("/api", githubWorkspaceRoutes);
 app.use("/api", githubDiffRoutes);
 app.use("/api", githubSyncRoutes);
 
