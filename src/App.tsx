@@ -2,17 +2,16 @@ import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import ProjectWorkspacePro from "./pages/ProjectWorkspacePro";
+import ProjectWorkspaceFinal from "./pages/ProjectWorkspaceFinal";
 import ProjectChanges from "./pages/ProjectChanges";
 import Dashboard from "./pages/Dashboard";
-import GitHubHub from "./pages/GitHubHub";
+import GitHubHubFinal from "./pages/GitHubHubFinal";
 import { ActivityPage, AssistantPage, ProjectsPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
 function Protected({ children }: { children: ReactNode }) {
   return localStorage.getItem("devora_token") ? <>{children}</> : <Navigate to="/login" replace />;
 }
-
-function ProtectedWorkspace() { return <Protected><ProjectWorkspacePro /></Protected>; }
+function ProtectedWorkspace() { return <Protected><ProjectWorkspaceFinal /></Protected>; }
 function ProtectedChanges() { return <Protected><ProjectChanges /></Protected>; }
 
 export default function App() {
@@ -22,7 +21,7 @@ export default function App() {
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
     <Route path="/projects" element={<Protected><ProjectsPage /></Protected>} />
     <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
-    <Route path="/github" element={<Protected><GitHubHub /></Protected>} />
+    <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
