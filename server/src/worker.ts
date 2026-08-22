@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { httpServerHandler } from "cloudflare:node";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
