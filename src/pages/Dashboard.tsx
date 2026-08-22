@@ -31,7 +31,11 @@ export default function Dashboard() {
 
   const loadProjects = async () => {
     try { setLoading(true); setError(""); const response = await api.get<Project[]>("/projects"); setProjects(response.data); }
-    catch (err: any) { setError(err.response?.data?.message || "Failed to load your projects."); }
+    catch (err: any) {
+      const message = err.response?.data?.message;
+      const detail = err.response?.data?.detail;
+      setError(detail ? `${message || "Failed to load your projects."} | ${detail}` : (message || "Failed to load your projects."));
+    }
     finally { setLoading(false); }
   };
 
@@ -60,7 +64,7 @@ export default function Dashboard() {
     <Layout active="Dashboard">
       <div className="border-b border-white/10 px-5 py-5 sm:px-8"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm text-zinc-500">Devora Workspace</p><h1 className="mt-1 text-2xl font-semibold">Welcome, {user?.name || "Developer"}</h1></div><button onClick={() => setShowModal(true)} className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black hover:bg-zinc-200"><Plus size={16} /> New Project</button></div></div>
       <section className="p-5 sm:p-8">
-        {error && <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
+        {error && <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 break-words">{error}</div>}
         <div className="grid gap-4 md:grid-cols-3">
           <button onClick={() => navigate("/projects")} className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5 text-left hover:border-white/20"><span className="text-sm text-zinc-400">Projects</span><p className="mt-3 text-3xl font-semibold">{projects.length}</p><span className="text-xs text-zinc-500">Open project manager</span></button>
           <button onClick={() => navigate("/github")} className="rounded-2xl border border-white/10 bg-[#0f0f12] p-5 text-left hover:border-white/20"><span className="text-sm text-zinc-400">GitHub</span><p className="mt-3 text-3xl font-semibold">→</p><span className="text-xs text-zinc-500">Open GitHub tools</span></button>
