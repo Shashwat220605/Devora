@@ -7,9 +7,11 @@ import ProjectChanges from "./pages/ProjectChanges";
 import Dashboard from "./pages/Dashboard";
 import GitHubHubFinal from "./pages/GitHubHubFinal";
 import GitHubDevWorkspace from "./pages/GitHubDevWorkspace";
+import GitHubDiffViewer from "./pages/GitHubDiffViewer";
+import ProjectCommandCenter from "./pages/ProjectCommandCenter";
 import CodeRunner from "./pages/CodeRunner";
 import Profile from "./pages/Profile";
-import { ActivityPage, AssistantPage, ProjectsPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
+import { ActivityPage, AssistantPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
 function Protected({ children }: { children: ReactNode }) {
   return localStorage.getItem("devora_token") ? <>{children}</> : <Navigate to="/login" replace />;
@@ -22,10 +24,11 @@ export default function App() {
     <Route path="/login" element={<Login />} />
     <Route path="/signup" element={<Signup />} />
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-    <Route path="/projects" element={<Protected><ProjectsPage /></Protected>} />
+    <Route path="/projects" element={<Protected><ProjectCommandCenter /></Protected>} />
     <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
     <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
     <Route path="/github/repo" element={<Protected><GitHubDevWorkspace /></Protected>} />
+    <Route path="/github/diff" element={<Protected><GitHubDiffViewer /></Protected>} />
     <Route path="/runner" element={<Protected><CodeRunner /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
