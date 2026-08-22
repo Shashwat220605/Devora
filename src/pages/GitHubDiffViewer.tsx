@@ -9,101 +9,26 @@ type Project = { id: string; name: string };
 type Repo = { name: string; fullName: string; url: string };
 type Branch = { name: string; protected: boolean; sha: string | null };
 
-function diffRows(value: string) {
-  return value.split("\n").map((line, index) => {
-    const mode = line.startsWith("+") && !line.startsWith("+++") ? "add" : line.startsWith("-") && !line.startsWith("---") ? "delete" : line.startsWith("@@") ? "hunk" : "same";
-    return { id: `${index}-${line}`, line, mode };
-  });
-}
+function diffRows(value: string) { return value.split("\n").map((line, index) => ({ id: `${index}-${line}`, line, mode: line.startsWith("+") && !line.startsWith("+++") ? "add" : line.startsWith("-") && !line.startsWith("---") ? "delete" : line.startsWith("@@") ? "hunk" : "same" })); }
 
 export default function GitHubDiffViewer() {
   const [params] = useSearchParams();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [projectId, setProjectId] = useState(params.get("projectId") || "");
-  const [repositoryUrl, setRepositoryUrl] = useState(params.get("url") || "");
-  const [branch, setBranch] = useState(params.get("branch") || "");
-  const [changes, setChanges] = useState<Change[]>([]);
-  const [selectedPath, setSelectedPath] = useState("");
-  const [mode, setMode] = useState<"unified" | "split">("unified");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]); const [repos, setRepos] = useState<Repo[]>([]); const [branches, setBranches] = useState<Branch[]>([]);
+  const [projectId, setProjectId] = useState(params.get("projectId") || ""); const [repositoryUrl, setRepositoryUrl] = useState(params.get("url") || ""); const [branch, setBranch] = useState(params.get("branch") || "");
+  const [changes, setChanges] = useState<Change[]>([]); const [selectedPath, setSelectedPath] = useState(""); const [mode, setMode] = useState<"unified" | "split">("unified"); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
   const [summary, setSummary] = useState<{ repository: string; branch: string; filesChecked: number; totalChanges: number } | null>(null);
+  const selected = changes.find((change) => change.path === selectedPath) || changes[0] || null; const rows = useMemo(() => selected ? diffRows(selected.preview) : [], [selected]);
 
-  const selected = changes.find((change) => change.path === selectedPath) || changes[0] || null;
-  const rows = useMemo(() => (selected ? diffRows(selected.preview) : []), [selected]);
+  useEffect(() => { void (async () => { try { const [projectResponse, repoResponse] = await Promise.all([api.get<Project[]>("/projects"), api.get<any[]>("/github/repos")]); const mapped = repoResponse.data.map((repo: any) => ({ name: repo.full_name || repo.name, fullName: repo.full_name || repo.name, url: repo.html_url || repo.url })).filter((repo: Repo) => repo.url); setProjects(projectResponse.data); setRepos(mapped); if (!projectId && projectResponse.data[0]) setProjectId(projectResponse.data[0].id); if (!repositoryUrl && mapped[0]) setRepositoryUrl(mapped[0].url); } catch (err: any) { setError(err.response?.data?.message || "Unable to load diff workspace."); } })(); }, []);
+  useEffect(() => { if (!repositoryUrl) return; setBranches([]); setBranch(""); void api.get<Branch[]>("/github/branches", { params: { repositoryUrl } }).then((response) => { setBranches(response.data); if (response.data[0]) setBranch(response.data[0].name); }).catch((err: any) => setError(err.response?.data?.message || "Unable to load branches.")); }, [repositoryUrl]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const [projectResponse, repoResponse] = await Promise.all([
-          api.get<Project[]>("/projects"),
-          api.get<any[]>("/github/repos"),
-        ]);
-        const mapped = repoResponse.data.map((repo) => ({ name: repo.full_name || repo.name, fullName: repo.full_name || repo.name, url: repo.html_url || repo.url })).filter((repo) => repo.url);
-        setProjects(projectResponse.data);
-        setRepos(mapped);
-        if (!projectId && projectResponse.data[0]) setProjectId(projectResponse.data[0].id);
-        if (!repositoryUrl && mapped[0]) setRepositoryUrl(mapped[0].url);
-      } catch (err: any) {
-        setError(err.response?.data?.message || "Unable to load diff workspace.");
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (!repositoryUrl) return;
-    setBranches([]);
-    setBranch("");
-    void api.get<Branch[]>("/github/branches", { params: { repositoryUrl } })
-      .then((response) => {
-        setBranches(response.data);
-        if (response.data[0]) setBranch(response.data[0].name);
-      })
-      .catch((err: any) => setError(err.response?.data?.message || "Unable to load branches."));
-  }, [repositoryUrl]);
-
-  const compare = async () => {
-    if (!projectId || !repositoryUrl || !branch) {
-      setError("Select a project, repository, and branch first.");
-      return;
-    }
-    try {
-      setLoading(true);
-      setError("");
-      const response = await api.post<{ repository: string; branch: string; filesChecked: number; totalChanges: number; changes: Change[] }>("/github/diff", { projectId, repositoryUrl, branch });
-      setSummary({ repository: response.data.repository, branch: response.data.branch, filesChecked: response.data.filesChecked, totalChanges: response.data.totalChanges });
-      setChanges(response.data.changes);
-      setSelectedPath(response.data.changes[0]?.path || "");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Unable to calculate diff.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const compare = async () => { if (!projectId || !repositoryUrl || !branch) { setError("Select a project, repository, and branch first."); return; } try { setLoading(true); setError(""); const response = await api.post<{ repository: string; branch: string; filesChecked: number; totalChanges: number; changes: Change[] }>("/github/diff-view", { projectId, repositoryUrl, branch }); setSummary({ repository: response.data.repository, branch: response.data.branch, filesChecked: response.data.filesChecked, totalChanges: response.data.totalChanges }); setChanges(response.data.changes); setSelectedPath(response.data.changes[0]?.path || ""); } catch (err: any) { setError(err.response?.data?.message || "Unable to calculate diff."); } finally { setLoading(false); } };
 
   return <Layout active="Projects">
-    <div className="border-b border-white/10 px-5 py-6 sm:px-8">
-      <Link to="/projects" className="inline-flex items-center gap-2 text-xs text-zinc-500 hover:text-white"><ArrowLeft size={14}/> Back to Projects</Link>
-      <div className="mt-4 flex items-end justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.2em] text-zinc-600">Git tooling</p><h1 className="mt-2 text-2xl font-semibold">Diff Viewer</h1><p className="mt-1 text-sm text-zinc-500">Inspect exactly what differs between your Devora project and GitHub.</p></div><div className="flex rounded-xl border border-white/10 p-1"><button onClick={() => setMode("unified")} className={`rounded-lg px-3 py-2 text-xs ${mode === "unified" ? "bg-white text-black" : "text-zinc-500"}`}>Unified</button><button onClick={() => setMode("split")} className={`rounded-lg px-3 py-2 text-xs ${mode === "split" ? "bg-white text-black" : "text-zinc-500"}`}>Split</button></div></div>
-    </div>
-    <section className="p-5 sm:p-8">
-      {error && <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
-      <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
-        <aside className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4">
-          <label className="text-xs text-zinc-500">Project<select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select project</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-          <label className="mt-4 block text-xs text-zinc-500">GitHub repository<select value={repositoryUrl} onChange={(e) => setRepositoryUrl(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select repository</option>{repos.map((item) => <option key={item.url} value={item.url}>{item.name}</option>)}</select></label>
-          <label className="mt-4 block text-xs text-zinc-500">Branch<select value={branch} onChange={(e) => setBranch(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select branch</option>{branches.map((item) => <option key={item.name} value={item.name}>{item.name}{item.protected ? " · protected" : ""}</option>)}</select></label>
-          <button onClick={() => void compare()} disabled={loading} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40">{loading ? <Loader2 size={15} className="animate-spin"/> : <GitCompareArrows size={15}/>} Compare</button>
-          {summary && <div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/10 p-3"><p className="text-[10px] text-zinc-600">Files checked</p><p className="mt-1 text-lg font-semibold">{summary.filesChecked}</p></div><div className="rounded-xl border border-white/10 p-3"><p className="text-[10px] text-zinc-600">Changes</p><p className="mt-1 text-lg font-semibold">{summary.totalChanges}</p></div></div>}
-          <div className="mt-5 max-h-[430px] overflow-auto space-y-1">{changes.map((change) => <button key={change.path} onClick={() => setSelectedPath(change.path)} className={`w-full rounded-xl border px-3 py-3 text-left ${selected?.path === change.path ? "border-white/20 bg-white/[0.06]" : "border-white/5 bg-black/10"}`}><div className="flex items-center justify-between gap-3"><span className="truncate font-mono text-xs text-zinc-300">{change.path}</span><span className={`rounded-full px-2 py-0.5 text-[9px] uppercase ${change.status === "added" ? "bg-emerald-500/10 text-emerald-400" : change.status === "deleted" ? "bg-red-500/10 text-red-400" : "bg-amber-500/10 text-amber-300"}`}>{change.status}</span></div><p className="mt-1 text-[10px] text-zinc-600">+{change.additions} / -{change.deletions}</p></button>)}</div>
-        </aside>
-        <div className="rounded-2xl border border-white/10 bg-black overflow-hidden min-h-[650px]">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="text-sm font-medium">{selected?.path || "No file selected"}</p><p className="text-[11px] text-zinc-600">{summary ? `${summary.repository} · ${summary.branch}` : "Run Compare to inspect changes"}</p></div><button onClick={() => void compare()} disabled={loading || !selected} className="rounded-lg border border-white/10 p-2 text-zinc-500 hover:text-white disabled:opacity-30"><RefreshCw size={14}/></button></div>
-          {!selected ? <div className="flex h-[580px] items-center justify-center text-sm text-zinc-600">No differences to display.</div> : mode === "unified" ? <div className="max-h-[590px] overflow-auto p-4 font-mono text-xs leading-6">{rows.map((row) => <div key={row.id} className={`whitespace-pre-wrap px-3 ${row.mode === "add" ? "bg-emerald-500/10 text-emerald-300" : row.mode === "delete" ? "bg-red-500/10 text-red-300" : row.mode === "hunk" ? "bg-sky-500/10 text-sky-300" : "text-zinc-500"}`}>{row.line || " "}</div>)}</div> : <div className="grid max-h-[590px] overflow-auto md:grid-cols-2">{["github","devora"].map((title, index) => <div key={title} className="border-r border-white/10 last:border-r-0"><div className="sticky top-0 border-b border-white/10 bg-[#101014] px-3 py-2 text-[11px] text-zinc-500">{index === 0 ? "GitHub" : "Devora"}</div><pre className="p-3 font-mono text-xs leading-6 text-zinc-400">{selected.preview.split("\n").filter((line) => index === 0 ? !line.startsWith("+") : !line.startsWith("-")).join("\n")}</pre></div>)}</div>}
-        </div>
-      </div>
-    </section>
+    <div className="border-b border-white/10 px-5 py-6 sm:px-8"><Link to="/projects" className="inline-flex items-center gap-2 text-xs text-zinc-500 hover:text-white"><ArrowLeft size={14}/> Back to Projects</Link><div className="mt-4 flex items-end justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.2em] text-zinc-600">Git tooling</p><h1 className="mt-2 text-2xl font-semibold">Diff Viewer</h1><p className="mt-1 text-sm text-zinc-500">Inspect exactly what differs between your Devora project and GitHub.</p></div><div className="flex rounded-xl border border-white/10 p-1"><button onClick={() => setMode("unified")} className={`rounded-lg px-3 py-2 text-xs ${mode === "unified" ? "bg-white text-black" : "text-zinc-500"}`}>Unified</button><button onClick={() => setMode("split")} className={`rounded-lg px-3 py-2 text-xs ${mode === "split" ? "bg-white text-black" : "text-zinc-500"}`}>Split</button></div></div></div>
+    <section className="p-5 sm:p-8">{error && <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}<div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+      <aside className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4"><label className="text-xs text-zinc-500">Project<select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select project</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label className="mt-4 block text-xs text-zinc-500">GitHub repository<select value={repositoryUrl} onChange={(e) => setRepositoryUrl(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select repository</option>{repos.map((item) => <option key={item.url} value={item.url}>{item.name}</option>)}</select></label><label className="mt-4 block text-xs text-zinc-500">Branch<select value={branch} onChange={(e) => setBranch(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select branch</option>{branches.map((item) => <option key={item.name} value={item.name}>{item.name}{item.protected ? " · protected" : ""}</option>)}</select></label><button onClick={() => void compare()} disabled={loading} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40">{loading ? <Loader2 size={15} className="animate-spin"/> : <GitCompareArrows size={15}/>} Compare</button>{summary && <div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/10 p-3"><p className="text-[10px] text-zinc-600">Files checked</p><p className="mt-1 text-lg font-semibold">{summary.filesChecked}</p></div><div className="rounded-xl border border-white/10 p-3"><p className="text-[10px] text-zinc-600">Changes</p><p className="mt-1 text-lg font-semibold">{summary.totalChanges}</p></div></div>}<div className="mt-5 max-h-[430px] overflow-auto space-y-1">{changes.map((change) => <button key={change.path} onClick={() => setSelectedPath(change.path)} className={`w-full rounded-xl border px-3 py-3 text-left ${selected?.path === change.path ? "border-white/20 bg-white/[0.06]" : "border-white/5 bg-black/10"}`}><div className="flex items-center justify-between gap-3"><span className="truncate font-mono text-xs text-zinc-300">{change.path}</span><span className={`rounded-full px-2 py-0.5 text-[9px] uppercase ${change.status === "added" ? "bg-emerald-500/10 text-emerald-400" : change.status === "deleted" ? "bg-red-500/10 text-red-400" : "bg-amber-500/10 text-amber-300"}`}>{change.status}</span></div><p className="mt-1 text-[10px] text-zinc-600">+{change.additions} / -{change.deletions}</p></button>)}</div></aside>
+      <div className="rounded-2xl border border-white/10 bg-black overflow-hidden min-h-[650px]"><div className="flex items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="text-sm font-medium">{selected?.path || "No file selected"}</p><p className="text-[11px] text-zinc-600">{summary ? `${summary.repository} · ${summary.branch}` : "Run Compare to inspect changes"}</p></div><button onClick={() => void compare()} disabled={loading || !selected} className="rounded-lg border border-white/10 p-2 text-zinc-500 hover:text-white disabled:opacity-30"><RefreshCw size={14}/></button></div>{!selected ? <div className="flex h-[580px] items-center justify-center text-sm text-zinc-600">No differences to display.</div> : mode === "unified" ? <div className="max-h-[590px] overflow-auto p-4 font-mono text-xs leading-6">{rows.map((row) => <div key={row.id} className={`whitespace-pre-wrap px-3 ${row.mode === "add" ? "bg-emerald-500/10 text-emerald-300" : row.mode === "delete" ? "bg-red-500/10 text-red-300" : row.mode === "hunk" ? "bg-sky-500/10 text-sky-300" : "text-zinc-500"}`}>{row.line || " "}</div>)}</div> : <div className="grid max-h-[590px] overflow-auto md:grid-cols-2">{["github","devora"].map((title, index) => <div key={title} className="border-r border-white/10 last:border-r-0"><div className="sticky top-0 border-b border-white/10 bg-[#101014] px-3 py-2 text-[11px] text-zinc-500">{index === 0 ? "GitHub" : "Devora"}</div><pre className="p-3 font-mono text-xs leading-6 text-zinc-400">{selected.preview.split("\n").filter((line) => index === 0 ? !line.startsWith("+") : !line.startsWith("-")).join("\n")}</pre></div>)}</div>}</div>
+    </div></section>
   </Layout>;
 }
