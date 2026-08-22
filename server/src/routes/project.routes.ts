@@ -39,8 +39,11 @@ router.get("/", authenticate, async (req, res) => {
   } catch (error) {
     console.error("GET /projects error:", error);
 
+    const detail = error instanceof Error ? error.message : String(error);
+
     return res.status(500).json({
       message: "Failed to fetch projects",
+      detail,
     });
   }
 });
