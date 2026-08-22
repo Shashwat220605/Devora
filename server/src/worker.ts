@@ -51,7 +51,7 @@ function corsHeaders(origin: string | null) {
   return {
     "Access-Control-Allow-Origin": origin || FRONTEND_URL(),
     "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Headers": "authorization, content-type, cache-control",
     "Access-Control-Allow-Methods": "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
   };
 }
