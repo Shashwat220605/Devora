@@ -6,6 +6,7 @@ import ProjectWorkspaceFinal from "./pages/ProjectWorkspaceFinal";
 import ProjectChanges from "./pages/ProjectChanges";
 import Dashboard from "./pages/Dashboard";
 import GitHubHubFinal from "./pages/GitHubHubFinal";
+import Profile from "./pages/Profile";
 import { ActivityPage, AssistantPage, ProjectsPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -25,6 +26,7 @@ export default function App() {
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
+    <Route path="/profile" element={<Protected><Profile /></Protected>} />
     <Route path="/projects/:id" element={<ProtectedWorkspace />} />
     <Route path="/projects/:id/changes" element={<ProtectedChanges />} />
     <Route path="*" element={<Navigate to="/dashboard" replace />} />
