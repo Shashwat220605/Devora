@@ -5,7 +5,6 @@ import Layout from "./Layout";
 import api from "../services/api";
 
 type Project = { id: string; name: string; description: string | null; language: string | null; createdAt?: string; updatedAt?: string };
-
 type Repo = { name: string; url: string };
 
 export default function ProjectCommandCenter() {
@@ -17,18 +16,18 @@ export default function ProjectCommandCenter() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void Promise.all([api.get<Project[]>("/projects"), api.get<Repo[]>("/github/repos").catch(() => ({ data: [] as Repo[] }))])
+    void Promise.all([api.get<Project[]>("/projects"), api.get<any[]>("/github/repos").catch(() => ({ data: [] }))])
       .then(([projectResponse, repoResponse]) => {
+        const mapped = (repoResponse.data || []).map((repo: any) => ({ name: repo.full_name || repo.name, url: repo.html_url || repo.url })).filter((repo: Repo) => repo.url);
         setProjects(projectResponse.data);
-        setRepos(repoResponse.data);
+        setRepos(mapped);
         setProjectId(projectResponse.data[0]?.id || "");
-        setRepoUrl(repoResponse.data[0]?.url || "");
+        setRepoUrl(mapped[0]?.url || "");
       })
       .catch((err: any) => setError(err.response?.data?.message || "Unable to load projects."));
   }, []);
 
   const selected = useMemo(() => projects.find((item) => item.id === projectId) || projects[0] || null, [projects, projectId]);
-
   const openWorkspace = () => { if (selected) navigate(`/projects/${selected.id}`); };
   const openDiff = () => {
     if (!selected) return;
@@ -38,18 +37,11 @@ export default function ProjectCommandCenter() {
   };
 
   return <Layout active="Projects">
-    <div className="border-b border-white/10 px-5 py-6 sm:px-8">
-      <p className="text-xs uppercase tracking-[0.2em] text-zinc-600">Devora</p>
-      <h1 className="mt-2 text-2xl font-semibold">Project Command Center</h1>
-      <p className="mt-1 max-w-2xl text-sm text-zinc-500">One place to open code, inspect Git changes, run code, and jump into project activity.</p>
-    </div>
+    <div className="border-b border-white/10 px-5 py-6 sm:px-8"><p className="text-xs uppercase tracking-[0.2em] text-zinc-600">Devora</p><h1 className="mt-2 text-2xl font-semibold">Project Command Center</h1><p className="mt-1 max-w-2xl text-sm text-zinc-500">One place to open code, inspect Git changes, run code, and jump into project activity.</p></div>
     <section className="p-5 sm:p-8">
       {error && <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
       <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
-        <aside className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4">
-          <div className="flex items-center justify-between"><div><p className="font-medium">Projects</p><p className="mt-1 text-xs text-zinc-600">{projects.length} available</p></div><FolderGit2 size={17} className="text-zinc-600"/></div>
-          <div className="mt-4 space-y-2">{projects.map((project) => <button key={project.id} onClick={() => setProjectId(project.id)} className={`w-full rounded-xl border px-4 py-3 text-left ${project.id === projectId ? "border-white/20 bg-white/[0.06]" : "border-white/5 hover:border-white/10"}`}><div className="flex items-center justify-between gap-3"><span className="truncate text-sm font-medium">{project.name}</span><span className="text-[10px] text-zinc-600">{project.language || "code"}</span></div><p className="mt-1 truncate text-xs text-zinc-600">{project.description || "No description"}</p></button>)}</div>
-        </aside>
+        <aside className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4"><div className="flex items-center justify-between"><div><p className="font-medium">Projects</p><p className="mt-1 text-xs text-zinc-600">{projects.length} available</p></div><FolderGit2 size={17} className="text-zinc-600"/></div><div className="mt-4 space-y-2">{projects.map((project) => <button key={project.id} onClick={() => setProjectId(project.id)} className={`w-full rounded-xl border px-4 py-3 text-left ${project.id === projectId ? "border-white/20 bg-white/[0.06]" : "border-white/5 hover:border-white/10"}`}><div className="flex items-center justify-between gap-3"><span className="truncate text-sm font-medium">{project.name}</span><span className="text-[10px] text-zinc-600">{project.language || "code"}</span></div><p className="mt-1 truncate text-xs text-zinc-600">{project.description || "No description"}</p></button>)}</div></aside>
         <div className="space-y-5">
           {!selected ? <div className="rounded-2xl border border-dashed border-white/10 bg-[#0f0f12] p-10 text-center text-sm text-zinc-500">Create a project to open its command center.</div> : <>
             <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-6"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs uppercase tracking-[0.16em] text-zinc-600">Selected project</p><h2 className="mt-2 text-2xl font-semibold">{selected.name}</h2><p className="mt-2 max-w-2xl text-sm text-zinc-500">{selected.description || "A Devora project workspace."}</p></div><button onClick={openWorkspace} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black"><Code2 size={15}/> Open editor</button></div><div className="mt-6 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-white/10 p-4"><p className="text-[10px] uppercase text-zinc-600">Language</p><p className="mt-1 font-medium">{selected.language || "Unspecified"}</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-[10px] uppercase text-zinc-600">Created</p><p className="mt-1 text-sm text-zinc-300">{selected.createdAt ? new Date(selected.createdAt).toLocaleDateString() : "-"}</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-[10px] uppercase text-zinc-600">Updated</p><p className="mt-1 text-sm text-zinc-300">{selected.updatedAt ? new Date(selected.updatedAt).toLocaleString() : "-"}</p></div></div></div>
