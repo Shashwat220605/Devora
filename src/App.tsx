@@ -7,6 +7,7 @@ import ProjectChanges from "./pages/ProjectChanges";
 import Dashboard from "./pages/Dashboard";
 import GitHubHubFinal from "./pages/GitHubHubFinal";
 import GitHubDevWorkspace from "./pages/GitHubDevWorkspace";
+import CodeRunner from "./pages/CodeRunner";
 import Profile from "./pages/Profile";
 import { ActivityPage, AssistantPage, ProjectsPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
@@ -25,6 +26,7 @@ export default function App() {
     <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
     <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
     <Route path="/github/repo" element={<Protected><GitHubDevWorkspace /></Protected>} />
+    <Route path="/runner" element={<Protected><CodeRunner /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
