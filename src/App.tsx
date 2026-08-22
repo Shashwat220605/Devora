@@ -6,6 +6,7 @@ import ProjectWorkspaceFinal from "./pages/ProjectWorkspaceFinal";
 import ProjectChanges from "./pages/ProjectChanges";
 import Dashboard from "./pages/Dashboard";
 import GitHubHubFinal from "./pages/GitHubHubFinal";
+import GitHubRepoWorkspace from "./pages/GitHubRepoWorkspace";
 import Profile from "./pages/Profile";
 import { ActivityPage, AssistantPage, ProjectsPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
@@ -23,6 +24,7 @@ export default function App() {
     <Route path="/projects" element={<Protected><ProjectsPage /></Protected>} />
     <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
     <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
+    <Route path="/github/repo" element={<Protected><GitHubRepoWorkspace /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
