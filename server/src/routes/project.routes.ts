@@ -18,22 +18,28 @@ router.get("/", authenticate, async (req, res) => {
       });
     }
 
-    // Keep the list query lightweight. The Projects page only needs
-    // project fields, while repository data can be loaded separately.
+    // Keep this query deliberately small for the Workers runtime.
+    // Avoid relation loading and sorting so a stale/partial database schema
+    // cannot break the project list endpoint.
     const projects = await prisma.project.findMany({
       where: {
         ownerId: userId,
       },
-      orderBy: {
-        updatedAt: "desc",
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        language: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-    res.json(projects);
+    return res.json(projects);
   } catch (error) {
     console.error("GET /projects error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to fetch projects",
     });
   }
@@ -71,11 +77,11 @@ router.get("/:id", authenticate, async (req, res) => {
       });
     }
 
-    res.json(project);
+    return res.json(project);
   } catch (error) {
     console.error("GET /projects/:id error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to fetch project",
     });
   }
@@ -115,11 +121,11 @@ router.post("/", authenticate, async (req, res) => {
       },
     });
 
-    res.status(201).json(project);
+    return res.status(201).json(project);
   } catch (error) {
     console.error("POST /projects error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to create project",
     });
   }
@@ -157,13 +163,13 @@ router.delete("/:id", authenticate, async (req, res) => {
       },
     });
 
-    res.json({
+    return res.json({
       message: "Project deleted successfully",
     });
   } catch (error) {
     console.error("DELETE /projects/:id error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to delete project",
     });
   }
