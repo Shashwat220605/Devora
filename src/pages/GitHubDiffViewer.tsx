@@ -6,7 +6,7 @@ import api from "../services/api";
 
 type Change = { path: string; status: "added" | "modified" | "deleted"; additions: number; deletions: number; preview: string };
 type Project = { id: string; name: string };
-type Repo = { name: string; url: string };
+type Repo = { name: string; fullName: string; url: string };
 type Branch = { name: string; protected: boolean; sha: string | null };
 
 function diffRows(value: string) {
@@ -39,12 +39,13 @@ export default function GitHubDiffViewer() {
       try {
         const [projectResponse, repoResponse] = await Promise.all([
           api.get<Project[]>("/projects"),
-          api.get<Repo[]>("/github/repos"),
+          api.get<any[]>("/github/repos"),
         ]);
+        const mapped = repoResponse.data.map((repo) => ({ name: repo.full_name || repo.name, fullName: repo.full_name || repo.name, url: repo.html_url || repo.url })).filter((repo) => repo.url);
         setProjects(projectResponse.data);
-        setRepos(repoResponse.data);
+        setRepos(mapped);
         if (!projectId && projectResponse.data[0]) setProjectId(projectResponse.data[0].id);
-        if (!repositoryUrl && repoResponse.data[0]) setRepositoryUrl(repoResponse.data[0].url);
+        if (!repositoryUrl && mapped[0]) setRepositoryUrl(mapped[0].url);
       } catch (err: any) {
         setError(err.response?.data?.message || "Unable to load diff workspace.");
       }
@@ -53,10 +54,12 @@ export default function GitHubDiffViewer() {
 
   useEffect(() => {
     if (!repositoryUrl) return;
+    setBranches([]);
+    setBranch("");
     void api.get<Branch[]>("/github/branches", { params: { repositoryUrl } })
       .then((response) => {
         setBranches(response.data);
-        if (!branch && response.data[0]) setBranch(response.data[0].name);
+        if (response.data[0]) setBranch(response.data[0].name);
       })
       .catch((err: any) => setError(err.response?.data?.message || "Unable to load branches."));
   }, [repositoryUrl]);
@@ -90,7 +93,7 @@ export default function GitHubDiffViewer() {
       <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
         <aside className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4">
           <label className="text-xs text-zinc-500">Project<select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select project</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-          <label className="mt-4 block text-xs text-zinc-500">GitHub repository<select value={repositoryUrl} onChange={(e) => { setRepositoryUrl(e.target.value); setBranch(""); }} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select repository</option>{repos.map((item) => <option key={item.url} value={item.url}>{item.name}</option>)}</select></label>
+          <label className="mt-4 block text-xs text-zinc-500">GitHub repository<select value={repositoryUrl} onChange={(e) => setRepositoryUrl(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select repository</option>{repos.map((item) => <option key={item.url} value={item.url}>{item.name}</option>)}</select></label>
           <label className="mt-4 block text-xs text-zinc-500">Branch<select value={branch} onChange={(e) => setBranch(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101014] px-3 py-2.5 text-sm outline-none"><option value="">Select branch</option>{branches.map((item) => <option key={item.name} value={item.name}>{item.name}{item.protected ? " · protected" : ""}</option>)}</select></label>
           <button onClick={() => void compare()} disabled={loading} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40">{loading ? <Loader2 size={15} className="animate-spin"/> : <GitCompareArrows size={15}/>} Compare</button>
           {summary && <div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/10 p-3"><p className="text-[10px] text-zinc-600">Files checked</p><p className="mt-1 text-lg font-semibold">{summary.filesChecked}</p></div><div className="rounded-xl border border-white/10 p-3"><p className="text-[10px] text-zinc-600">Changes</p><p className="mt-1 text-lg font-semibold">{summary.totalChanges}</p></div></div>}
