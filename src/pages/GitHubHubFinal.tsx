@@ -108,6 +108,10 @@ export default function GitHubHubFinal() {
     } finally { setBusy(false); }
   };
 
+  const manageRepo = (repo: GitHubRepo) => {
+    navigate(`/github/repo?url=${encodeURIComponent(repo.html_url)}`);
+  };
+
   return (
     <Layout active="GitHub">
       <div className="border-b border-white/10 px-5 py-6 sm:px-8">
@@ -156,11 +160,15 @@ export default function GitHubHubFinal() {
                   <div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex items-center gap-2"><GitBranch size={16} /><h3 className="truncate font-medium">{repo.name}</h3>{repo.private && <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-zinc-500">Private</span>}</div><p className="mt-1 truncate text-xs text-zinc-600">{repo.full_name}</p></div><a href={repo.html_url} target="_blank" rel="noreferrer" className="rounded-lg p-2 text-zinc-500 hover:bg-white/[0.05] hover:text-white"><ExternalLink size={15} /></a></div>
                   <p className="mt-4 min-h-10 text-sm text-zinc-500">{repo.description || "No description provided."}</p>
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span className="rounded-full border border-white/10 px-2 py-1">{repo.language || "Unknown"}</span><span className="flex items-center gap-1 rounded-full border border-white/10 px-2 py-1"><GitBranch size={11} /> {repo.default_branch}</span></div>
-                  <div className="mt-5 flex gap-2"><button onClick={() => void importRepo(repo)} disabled={busy || !projectId} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-medium text-black hover:bg-zinc-200 disabled:opacity-40"><Upload size={15} /> Import</button><button onClick={() => projectId && navigate(`/projects/${projectId}`)} disabled={!projectId} className="flex-1 rounded-xl border border-white/10 px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/[0.04] disabled:opacity-40">Open workspace</button></div>
+                  <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                    <button onClick={() => void manageRepo(repo)} className="rounded-xl bg-white px-3 py-2.5 text-sm font-medium text-black hover:bg-zinc-200">Manage Git</button>
+                    <button onClick={() => void importRepo(repo)} disabled={busy || !projectId} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/[0.04] disabled:opacity-40"><Upload size={15} /> Import</button>
+                    <button onClick={() => projectId && navigate(`/projects/${projectId}`)} disabled={!projectId} className="rounded-xl border border-white/10 px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/[0.04] disabled:opacity-40">Open workspace</button>
+                  </div>
                 </div>
               ))}
             </div>
-            {!loading && filtered.length === 0 && <div className="mt-5 rounded-2xl border border-dashed border-white/10 bg-[#0f0f12] p-10 text-center text-sm text-zinc-500">No repositories found. Click Refresh to try again.</div>}
+            {!loading && filtered.length === 0 && <div className="mt-5 rounded-2xl border border-dashed border-white/10 bg-[#0f0f12] p-10 text-center text-sm text-zinc-600">No repositories found. Click Refresh to try again.</div>}
           </>
         )}
       </section>
