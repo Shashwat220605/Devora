@@ -18,15 +18,14 @@ router.get("/", authenticate, async (req, res) => {
       });
     }
 
+    // Keep the list query lightweight. The Projects page only needs
+    // project fields, while repository data can be loaded separately.
     const projects = await prisma.project.findMany({
       where: {
         ownerId: userId,
       },
       orderBy: {
         updatedAt: "desc",
-      },
-      include: {
-        repositories: true,
       },
     });
 
