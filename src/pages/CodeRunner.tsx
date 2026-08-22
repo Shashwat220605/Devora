@@ -32,15 +32,6 @@ console.log("Total:", total);
 `,
 };
 
-function formatValue(value: unknown) {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
 function buildHtml(language: Language, code: string) {
   if (language === "html") {
     return `<!doctype html><html><head><meta charset="UTF-8"><style>body{margin:0;padding:24px;background:#09090b;color:#fff;font-family:system-ui,sans-serif}*{box-sizing:border-box}</style></head><body>${code}</body></html>`;
