@@ -220,7 +220,8 @@ export default function TerminalPage() {
               <h1 className="mt-2 text-2xl font-semibold">Terminal</h1>
               <p className="mt-1 max-w-2xl text-sm text-zinc-500">A developer terminal for workspace navigation, Git inspection, build previews, and test previews.</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <a href="/runner" className="rounded-xl bg-white px-3 py-2 text-xs font-medium text-black hover:bg-zinc-200">Open Code Runner</a>
               <button onClick={reset} title="Reset terminal" className="rounded-lg border border-white/10 p-2 text-zinc-500 hover:bg-white/[0.04] hover:text-white"><RotateCcw size={15} /></button>
               <button onClick={() => void copyOutput()} title="Copy output" className="rounded-lg border border-white/10 p-2 text-zinc-500 hover:bg-white/[0.04] hover:text-white"><Copy size={15} /></button>
               <button onClick={clear} title="Clear terminal" className="rounded-lg border border-white/10 p-2 text-zinc-500 hover:bg-white/[0.04] hover:text-white"><Trash2 size={15} /></button>
