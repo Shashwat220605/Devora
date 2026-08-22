@@ -6,6 +6,10 @@ import { authenticate, type AuthenticatedRequest } from "../middleware/auth.midd
 const router = Router();
 const ENCRYPTION_KEY_HEX = process.env.GITHUB_TOKEN_ENCRYPTION_KEY;
 
+type StoredCredentials = {
+  accessToken?: string;
+};
+
 function getEncryptionKey() {
   if (!ENCRYPTION_KEY_HEX || !/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY_HEX)) {
     throw new Error("GITHUB_TOKEN_ENCRYPTION_KEY must be a 32-byte hex key");
@@ -24,12 +28,22 @@ function decrypt(value: string) {
   ]).toString("utf8");
 }
 
+function accessTokenFromStored(value: string) {
+  try {
+    const parsed = JSON.parse(value) as StoredCredentials;
+    if (parsed && typeof parsed.accessToken === "string") return parsed.accessToken;
+  } catch {
+    // Legacy manually connected tokens were stored directly.
+  }
+  return value;
+}
+
 async function getToken(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { githubTokenEnc: true },
   });
-  return user?.githubTokenEnc ? decrypt(user.githubTokenEnc) : null;
+  return user?.githubTokenEnc ? accessTokenFromStored(decrypt(user.githubTokenEnc)) : null;
 }
 
 function parseGitHubUrl(value: string) {
