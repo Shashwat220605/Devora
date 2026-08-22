@@ -12,6 +12,7 @@ console.log("Hello from", name);
 const numbers = [1, 2, 3, 4, 5];
 const total = numbers.reduce((sum, value) => sum + value, 0);
 console.log("Total:", total);
+total;
 `,
   html: `<main class="card">
   <h1>Hello Devora</h1>
@@ -82,11 +83,21 @@ export default function CodeRunner() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow) return;
       if (event.data?.source !== "devora-runner") return;
       setLogs((current) => [...current, { type: event.data.type, text: String(event.data.value) }]);
+      if (event.data.type === "result" || event.data.type === "error") {
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        setRunning(false);
+      }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  useEffect(() => () => {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
   }, []);
 
   const canPreview = language !== "javascript";
@@ -98,6 +109,9 @@ export default function CodeRunner() {
     setCode(starterCode[next]);
     setLogs([]);
     setPreview("");
+    setRunning(false);
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    if (frameRef.current) frameRef.current.srcdoc = "";
   };
 
   const clear = () => {
@@ -109,39 +123,36 @@ export default function CodeRunner() {
     if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     timeoutRef.current = null;
     setRunning(false);
+    if (frameRef.current) frameRef.current.srcdoc = "";
     setLogs((current) => [...current, { type: "error", text: "Execution stopped." }]);
   };
 
   const run = () => {
     clear();
-    setRunning(true);
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
 
     if (language !== "javascript") {
+      setRunning(true);
       setPreview(buildHtml(language, code));
       setRunning(false);
       return;
     }
 
+    setRunning(true);
     timeoutRef.current = window.setTimeout(() => {
       setRunning(false);
       setLogs((current) => [...current, { type: "error", text: "Execution timed out after 5 seconds." }]);
       if (frameRef.current) frameRef.current.srcdoc = "";
+      timeoutRef.current = null;
     }, 5000);
 
     if (frameRef.current) {
-      frameRef.current.srcdoc = buildHtml(language, code);
+      frameRef.current.srcdoc = buildHtml("javascript", code);
+    } else {
+      setRunning(false);
+      setLogs((current) => [...current, { type: "error", text: "Execution sandbox is not ready. Refresh the page and try again." }]);
     }
   };
-
-  useEffect(() => {
-    if (!running || language !== "javascript") return;
-    const doneTimer = window.setTimeout(() => {
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-      setRunning(false);
-    }, 250);
-    return () => window.clearTimeout(doneTimer);
-  }, [logs.length, language, running]);
 
   return (
     <Layout active="Code Runner">
@@ -189,6 +200,14 @@ export default function CodeRunner() {
               </div>
             </div>
           )}
+
+          <iframe
+            ref={frameRef}
+            title="JavaScript execution sandbox"
+            sandbox="allow-scripts"
+            className="hidden"
+            aria-hidden="true"
+          />
 
           <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4 text-xs leading-5 text-zinc-500">
             JavaScript runs inside a sandboxed iframe with a 5-second timeout. HTML and CSS run only as a local preview. No server-side code execution is enabled yet.
