@@ -1,0 +1,27 @@
+{
+  "name": "devora-vscode",
+  "displayName": "Devora",
+  "description": "Sync your local VS Code workspace with Devora and GitHub.",
+  "version": "0.1.0",
+  "publisher": "devora",
+  "engines": { "vscode": ">=1.85.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onCommand:devora.pull", "onCommand:devora.push", "onCommand:devora.openWorkspace"],
+  "contributes": {
+    "commands": [
+      { "command": "devora.pull", "title": "Devora: Pull Changes" },
+      { "command": "devora.push", "title": "Devora: Push Changes" },
+      { "command": "devora.openWorkspace", "title": "Devora: Open Project Workspace" }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.7.0"
+  }
+}
