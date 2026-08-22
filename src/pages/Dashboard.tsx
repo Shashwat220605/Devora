@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { FormEvent } from "react";
 import { ChevronRight, FolderGit2, GitBranch, Plus, Sparkles, Trash2 } from "lucide-react";
 import Layout from "./Layout";
