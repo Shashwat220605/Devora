@@ -3,6 +3,7 @@ import { Trash2, Copy, RotateCcw, Terminal as TerminalIcon } from "lucide-react"
 import Layout from "./Layout";
 
 type Line = { text: string; tone?: "command" | "error" | "muted" };
+type CommandResult = { clear: boolean; lines: Line[] };
 
 const INITIAL_LINES: Line[] = [
   { text: "Devora Terminal v1.0", tone: "muted" },
@@ -24,9 +25,9 @@ const COMMANDS = [
   "echo hello",
 ];
 
-function executeCommand(raw: string) {
+function executeCommand(raw: string): CommandResult {
   const value = raw.trim();
-  if (!value) return { clear: false, lines: [] as Line[] };
+  if (!value) return { clear: false, lines: [] };
   const [command, ...args] = value.split(/\s+/);
   const rest = args.join(" ");
 
@@ -47,10 +48,10 @@ function executeCommand(raw: string) {
           { text: "  npm run build  Preview build command" },
           { text: "  npm test    Preview test command" },
           { text: "  echo <text> Print text" },
-        ] as Line[],
+        ],
       };
     case "clear":
-      return { clear: true, lines: [] as Line[] };
+      return { clear: true, lines: [] };
     case "pwd":
       return { clear: false, lines: [{ text: "/devora/workspace" }] };
     case "ls":
