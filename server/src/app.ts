@@ -12,6 +12,7 @@ import githubOAuthBeginRoutes from "./routes/github-oauth-begin.routes.js";
 import githubWorkspaceRoutes from "./routes/github-workspace.routes.js";
 import githubDevtoolsRoutes from "./routes/github-devtools.routes.js";
 import githubDiffRoutes from "./routes/github-diff.routes.js";
+import githubDiffViewerRoutes from "./routes/github-diff-viewer.routes.js";
 import githubSyncRoutes from "./routes/github-sync.routes.js";
 
 const app = express();
@@ -62,6 +63,7 @@ app.use("/api", githubOAuthBeginRoutes);
 app.use("/api", githubWorkspaceRoutes);
 app.use("/api", githubDevtoolsRoutes);
 app.use("/api", githubDiffRoutes);
+app.use("/api", githubDiffViewerRoutes);
 app.use("/api", githubSyncRoutes);
 
 app.get("/api/health", (_req, res) => {
