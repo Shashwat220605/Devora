@@ -5,7 +5,7 @@ import Signup from "./pages/Signup";
 import ProjectWorkspaceFinal from "./pages/ProjectWorkspaceFinal";
 import ProjectChanges from "./pages/ProjectChanges";
 import Dashboard from "./pages/Dashboard";
-import GitHubPhase2 from "./pages/GitHubPhase2";
+import GitHubHubFinal from "./pages/GitHubHubFinal";
 import Profile from "./pages/Profile";
 import { ActivityPage, AssistantPage, ProjectsPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
@@ -22,7 +22,7 @@ export default function App() {
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
     <Route path="/projects" element={<Protected><ProjectsPage /></Protected>} />
     <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
-    <Route path="/github" element={<Protected><GitHubPhase2 /></Protected>} />
+    <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
     <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
