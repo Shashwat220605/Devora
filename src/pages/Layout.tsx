@@ -10,8 +10,8 @@ import {
   GitBranch,
   LayoutDashboard,
   LogOut,
+  Pickaxe,
   Settings,
-  Sparkles,
   Terminal,
   UserRound,
 } from "lucide-react";
@@ -86,7 +86,7 @@ export default function Layout({ children, active }: LayoutProps) {
             className="mb-7 flex items-center gap-3 rounded-xl p-2 text-left hover:bg-white/[0.04]"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black">
-              <Sparkles size={19} />
+              <Pickaxe size={19} strokeWidth={2.2} />
             </div>
             <div>
               <p className="font-semibold">Devora</p>
