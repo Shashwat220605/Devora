@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
+  Bell,
   Bot,
+  Check,
   FolderGit2,
   GitBranch,
   LayoutDashboard,
@@ -12,6 +15,12 @@ import {
   Terminal,
   UserRound,
 } from "lucide-react";
+import {
+  clearNotifications,
+  getNotifications,
+  markAllNotificationsRead,
+  type NotificationItem,
+} from "../services/notifications";
 
 interface LayoutProps {
   children: ReactNode;
@@ -30,18 +39,43 @@ const items = [
 
 const mobileItems = items.slice(0, 6);
 
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Now";
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 export default function Layout({ children, active }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => getNotifications());
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const currentUser = JSON.parse(
     localStorage.getItem("devora_user") || "null",
   ) as { name?: string; email?: string } | null;
+
+  useEffect(() => {
+    const sync = () => setNotifications(getNotifications());
+    window.addEventListener("devora:notifications", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("devora:notifications", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   const logout = () => {
     localStorage.removeItem("devora_token");
     localStorage.removeItem("devora_user");
     navigate("/login", { replace: true });
   };
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white">
@@ -82,6 +116,30 @@ export default function Layout({ children, active }: LayoutProps) {
           </nav>
 
           <div className="mt-auto border-t border-white/10 pt-4">
+            <div className="relative mb-3">
+              <button
+                onClick={() => setNotificationOpen((value) => !value)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-left hover:bg-black/30"
+              >
+                <span className="flex items-center gap-3 text-sm text-zinc-300">
+                  <Bell size={16} />
+                  Notifications
+                </span>
+                {unreadCount > 0 ? (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-black">{unreadCount}</span>
+                ) : (
+                  <Check size={15} className="text-zinc-700" />
+                )}
+              </button>
+              {notificationOpen && (
+                <NotificationPopover
+                  notifications={notifications}
+                  onRead={() => { markAllNotificationsRead(); setNotifications(getNotifications()); }}
+                  onClear={() => { clearNotifications(); setNotifications([]); }}
+                />
+              )}
+            </div>
+
             <button
               onClick={() => navigate("/profile")}
               className="mb-3 flex w-full items-center gap-3 rounded-xl bg-black/20 p-3 text-left hover:bg-black/30"
@@ -140,6 +198,44 @@ export default function Layout({ children, active }: LayoutProps) {
           })}
         </div>
       </nav>
+    </div>
+  );
+}
+
+function NotificationPopover({
+  notifications,
+  onRead,
+  onClear,
+}: {
+  notifications: NotificationItem[];
+  onRead: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="absolute bottom-12 left-0 z-50 w-[310px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-[#111116] p-3 shadow-2xl">
+      <div className="flex items-center justify-between px-1 pb-2">
+        <div>
+          <p className="text-sm font-semibold">Recent notifications</p>
+          <p className="text-[11px] text-zinc-600">Workspace activity from this browser</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onRead} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-400 hover:text-white">Read all</button>
+          <button onClick={onClear} className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-zinc-400 hover:text-white">Clear</button>
+        </div>
+      </div>
+      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+        {notifications.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-600">No notifications yet.</div>
+        ) : notifications.slice(0, 12).map((item) => (
+          <div key={item.id} className={`rounded-xl border p-3 ${item.read ? "border-white/5 bg-black/10" : "border-white/10 bg-white/[0.03]"}`}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-medium text-zinc-200">{item.title}</p>
+              <span className="text-[10px] text-zinc-700">{formatTime(item.createdAt)}</span>
+            </div>
+            <p className="mt-1 break-words text-[11px] text-zinc-500">{item.message}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
