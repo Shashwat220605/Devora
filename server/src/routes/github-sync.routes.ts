@@ -12,6 +12,12 @@ const MAX_FILES = 150;
 const MAX_FILE_BYTES = 1_000_000;
 const ENCRYPTION_KEY_HEX = process.env.GITHUB_TOKEN_ENCRYPTION_KEY;
 
+type StoredCredentials = {
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: number;
+};
+
 function getKey() {
   if (!ENCRYPTION_KEY_HEX || !/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY_HEX)) {
     throw new Error("GITHUB_TOKEN_ENCRYPTION_KEY must be a 32-byte hex key");
@@ -36,12 +42,22 @@ function decrypt(value: string) {
   ]).toString("utf8");
 }
 
+function accessTokenFromStored(value: string) {
+  try {
+    const parsed = JSON.parse(value) as StoredCredentials;
+    if (parsed && typeof parsed.accessToken === "string") return parsed.accessToken;
+  } catch {
+    // Legacy manually connected tokens were stored directly.
+  }
+  return value;
+}
+
 async function tokenFor(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { githubTokenEnc: true },
   });
-  return user?.githubTokenEnc ? decrypt(user.githubTokenEnc) : null;
+  return user?.githubTokenEnc ? accessTokenFromStored(decrypt(user.githubTokenEnc)) : null;
 }
 
 function repoParts(value: string) {
@@ -183,7 +199,7 @@ router.post("/github/push-mirror", authenticate, async (req, res) => {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
 
-    const { projectId, repositoryUrl, branch } = req.body;
+    const { projectId, repositoryUrl, branch, commitMessage } = req.body;
     if (typeof projectId !== "string") return res.status(400).json({ message: "projectId is required" });
 
     const project = await prisma.project.findFirst({
@@ -272,10 +288,15 @@ router.post("/github/push-mirror", authenticate, async (req, res) => {
 
     if (!newTree.sha) throw new Error("Failed to create Git tree");
 
+    const message =
+      typeof commitMessage === "string" && commitMessage.trim()
+        ? commitMessage.trim().slice(0, 120)
+        : `Devora sync: ${project.name}`;
+
     const commit = (await github(`${base}/git/commits`, token, {
       method: "POST",
       body: JSON.stringify({
-        message: `Devora sync: ${project.name}`,
+        message,
         tree: newTree.sha,
         parents: [parentSha],
       }),
@@ -289,10 +310,11 @@ router.post("/github/push-mirror", authenticate, async (req, res) => {
     });
 
     return res.json({
-      message: "Devora project mirrored to GitHub",
+      message: "Devora project committed to GitHub",
       branch: targetBranch,
       commitSha: commit.sha,
       commitUrl: commit.html_url || null,
+      commitMessage: message,
       filesPushed: files.length,
       filesDeleted: deletedRemote,
     });
