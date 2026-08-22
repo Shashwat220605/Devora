@@ -2,10 +2,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
 /**
- * Cloudflare Workers run in an edge/serverless environment where a long-lived
- * global PrismaClient can reuse connections across requests in ways that are
- * not reliable for this runtime. Create the adapter/client for each request.
- * Hyperdrive handles database connection pooling at the network layer.
+ * Cloudflare Workers / Hyperdrive Prisma factory.
+ * Create a client from the current DATABASE_URL for each request path.
  */
 export function getPrisma() {
   const connectionString = process.env.DATABASE_URL;
@@ -22,3 +20,8 @@ export function getPrisma() {
     adapter,
   });
 }
+
+// Backward-compatible default export for existing route modules.
+// New code should prefer getPrisma().
+const prisma = getPrisma();
+export default prisma;
