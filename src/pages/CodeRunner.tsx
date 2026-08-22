@@ -66,7 +66,7 @@ function buildHtml(language: Language, code: string) {
   console.info = (...args) => { send("log", args.map(stringify).join(" ")); originalInfo(...args); };
   console.warn = (...args) => { send("error", args.map(stringify).join(" ")); originalWarn(...args); };
   console.error = (...args) => { send("error", args.map(stringify).join(" ")); originalError(...args); };
-  window.onerror = (message, _source, line, column) => { send("error", String(message) + ` (line ${line}, column ${column})`); };
+  window.onerror = (message, _source, line, column) => { send("error", String(message) + " (line " + line + ", column " + column + ")"); };
   window.onunhandledrejection = (event) => send("error", String(event.reason));
   try {
     const result = (async () => { ${safeCode}\n })();
