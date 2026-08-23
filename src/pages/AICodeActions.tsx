@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, FileCode2, Lightbulb, RefreshCw, Sparkles, Wand2, X } from "lucide-react";
+import { Bot, Check, FileCode2, GitCompareArrows, Lightbulb, RefreshCw, Sparkles, Wand2, X } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
 
@@ -7,6 +7,39 @@ type Project = { id: string; name: string };
 type FileItem = { id: string; path: string; content: string; language: string | null };
 type Action = "explain" | "fix" | "refactor" | "tests";
 type AIResponse = { model: string; action: Action; explanation: string; result: string };
+type DiffLine = { kind: "same" | "add" | "remove"; text: string; oldNo?: number; newNo?: number };
+
+function buildDiff(before: string, after: string): DiffLine[] {
+  const oldLines = before.split("\n");
+  const newLines = after.split("\n");
+  const rows: DiffLine[] = [];
+  const max = Math.max(oldLines.length, newLines.length);
+
+  let oldNo = 1;
+  let newNo = 1;
+  for (let index = 0; index < max; index += 1) {
+    const oldLine = oldLines[index];
+    const newLine = newLines[index];
+
+    if (oldLine === newLine) {
+      rows.push({ kind: "same", text: oldLine ?? "", oldNo, newNo });
+      oldNo += 1;
+      newNo += 1;
+      continue;
+    }
+
+    if (typeof oldLine === "string") {
+      rows.push({ kind: "remove", text: oldLine, oldNo });
+      oldNo += 1;
+    }
+    if (typeof newLine === "string") {
+      rows.push({ kind: "add", text: newLine, newNo });
+      newNo += 1;
+    }
+  }
+
+  return rows;
+}
 
 export default function AICodeActions() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -20,10 +53,21 @@ export default function AICodeActions() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const selected = useMemo(
     () => files.find((file) => file.id === fileId) || files[0] || null,
     [files, fileId],
+  );
+
+  const diff = useMemo(
+    () => (selected && preview && action !== "explain" ? buildDiff(selected.content, preview) : []),
+    [selected, preview, action],
+  );
+
+  const changedLines = useMemo(
+    () => diff.filter((line) => line.kind !== "same").length,
+    [diff],
   );
 
   const loadProjects = async () => {
@@ -48,6 +92,7 @@ export default function AICodeActions() {
     setFileId("");
     setPreview("");
     setExplanation("");
+    setReviewOpen(false);
     if (projectId) {
       void loadFiles().catch(() => setError("Unable to load project files."));
     }
@@ -59,6 +104,7 @@ export default function AICodeActions() {
       setBusy(true);
       setError("");
       setMessage("");
+      setReviewOpen(false);
       const response = await api.post<AIResponse>("/ai/code-action", {
         action,
         path: selected.path,
@@ -75,6 +121,13 @@ export default function AICodeActions() {
     }
   };
 
+  const reject = () => {
+    setReviewOpen(false);
+    setPreview("");
+    setExplanation("");
+    setMessage("AI changes rejected. Your file was not modified.");
+  };
+
   const apply = async () => {
     if (!selected || !preview || action === "explain") return;
     try {
@@ -87,6 +140,7 @@ export default function AICodeActions() {
       setFiles((items) =>
         items.map((item) => (item.id === response.data.id ? response.data : item)),
       );
+      setReviewOpen(false);
       setPreview("");
       setExplanation("");
       setMessage(`Applied ${action} action to ${response.data.path}.`);
@@ -145,7 +199,7 @@ export default function AICodeActions() {
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               {([['explain', 'Explain'], ['fix', 'Fix'], ['refactor', 'Refactor'], ['tests', 'Tests']] as const).map(([id, label]) => (
-                <button key={id} onClick={() => { setAction(id); setPreview(""); setExplanation(""); }} className={`rounded-xl border px-3 py-2.5 text-xs ${action === id ? "border-white/20 bg-white text-black" : "border-white/10 text-zinc-400"}`}>
+                <button key={id} onClick={() => { setAction(id); setPreview(""); setExplanation(""); setReviewOpen(false); }} className={`rounded-xl border px-3 py-2.5 text-xs ${action === id ? "border-white/20 bg-white text-black" : "border-white/10 text-zinc-400"}`}>
                   {label}
                 </button>
               ))}
@@ -174,8 +228,8 @@ export default function AICodeActions() {
                   <span>Gemini result</span>
                 </div>
                 {preview && action !== "explain" && (
-                  <button onClick={() => void apply()} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40">
-                    <Wand2 size={13} /> Apply
+                  <button onClick={() => setReviewOpen(true)} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40">
+                    <GitCompareArrows size={13} /> Review changes
                   </button>
                 )}
               </div>
@@ -187,6 +241,48 @@ export default function AICodeActions() {
             </div>
           </div>
         </div>
+
+        {reviewOpen && selected && preview && action !== "explain" && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0e] shadow-2xl">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                <div>
+                  <div className="flex items-center gap-2 font-medium"><GitCompareArrows size={17} /> Review AI changes</div>
+                  <p className="mt-1 text-xs text-zinc-500">{selected.path} · {changedLines} changed line{changedLines === 1 ? "" : "s"}</p>
+                </div>
+                <button onClick={reject} className="rounded-lg p-2 text-zinc-500 hover:bg-white/[0.05] hover:text-white"><X size={18} /></button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 overflow-auto lg:grid-cols-2">
+                <div className="border-b border-white/10 lg:border-b-0 lg:border-r">
+                  <div className="border-b border-white/10 px-4 py-3 text-xs font-medium text-red-300">Current file</div>
+                  <pre className="max-h-[60vh] overflow-auto p-4 font-mono text-xs leading-6 text-zinc-400">{selected.content}</pre>
+                </div>
+                <div>
+                  <div className="border-b border-white/10 px-4 py-3 text-xs font-medium text-emerald-300">Proposed file</div>
+                  <pre className="max-h-[60vh] overflow-auto p-4 font-mono text-xs leading-6 text-zinc-300">{preview}</pre>
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 px-5 py-4">
+                <div className="mb-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                  <div className="border-b border-white/10 px-4 py-2 text-xs text-zinc-500">Change summary</div>
+                  <div className="max-h-48 overflow-auto font-mono text-[11px] leading-5">
+                    {diff.map((line, index) => {
+                      const marker = line.kind === "add" ? "+" : line.kind === "remove" ? "-" : " ";
+                      const tone = line.kind === "add" ? "bg-emerald-500/10 text-emerald-300" : line.kind === "remove" ? "bg-red-500/10 text-red-300" : "text-zinc-600";
+                      return <div key={`${line.kind}-${index}`} className={`grid grid-cols-[48px_48px_1fr] px-3 ${tone}`}><span className="text-right pr-2 text-zinc-700">{line.oldNo ?? ""}</span><span className="text-right pr-2 text-zinc-700">{line.newNo ?? ""}</span><span className="whitespace-pre-wrap break-words"><span className="mr-2">{marker}</span>{line.text}</span></div>;
+                    })}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={reject} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-zinc-400 hover:bg-white/[0.04] hover:text-white"><X size={15} /> Reject</button>
+                  <button onClick={() => void apply()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black disabled:opacity-40"><Check size={15} /> Apply changes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     </Layout>
   );
