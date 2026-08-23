@@ -6,6 +6,7 @@ const router = Router();
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const MAX_CONTEXT_FILES = 24;
 const MAX_FILE_CHARS = 10_000;
+const SECRET_PATH = /(^|\/)(\.env(?:\..*)?|.*\.pem|.*\.key|.*\.p12|.*\.pfx|credentials?\.json|secrets?\.(json|ya?ml))$/i;
 
 const actionInstructions: Record<string, string> = {
   explain: "Explain the selected code clearly for a developer. Do not rewrite the code.",
@@ -61,7 +62,7 @@ async function getProjectContext(projectId: string | undefined, userId: string) 
       language: true,
       files: {
         orderBy: { path: "asc" },
-        take: MAX_CONTEXT_FILES,
+        take: 80,
         select: { path: true, language: true, content: true },
       },
     },
@@ -69,18 +70,21 @@ async function getProjectContext(projectId: string | undefined, userId: string) 
 
   if (!project) return "";
 
-  const preferred = [...project.files].sort((a, b) => {
-    const score = (path: string) => {
-      if (path === "package.json") return 100;
-      if (path === "README.md") return 90;
-      if (/^(src|server)\//.test(path)) return 70;
-      if (/(route|api|auth|app|index|main|config)/i.test(path)) return 60;
-      return 20;
-    };
-    return score(b.path) - score(a.path) || a.path.localeCompare(b.path);
-  });
+  const visibleFiles = project.files
+    .filter((file) => !SECRET_PATH.test(file.path))
+    .sort((a, b) => {
+      const score = (path: string) => {
+        if (path === "package.json") return 100;
+        if (path === "README.md") return 90;
+        if (/^(src|server)\//.test(path)) return 70;
+        if (/(route|api|auth|app|index|main|config)/i.test(path)) return 60;
+        return 20;
+      };
+      return score(b.path) - score(a.path) || a.path.localeCompare(b.path);
+    })
+    .slice(0, MAX_CONTEXT_FILES);
 
-  const files = preferred.map((file) => {
+  const files = visibleFiles.map((file) => {
     const content = file.content.length > MAX_FILE_CHARS
       ? `${file.content.slice(0, MAX_FILE_CHARS)}\n...[truncated]`
       : file.content;
@@ -91,9 +95,10 @@ async function getProjectContext(projectId: string | undefined, userId: string) 
     `Project: ${project.name}`,
     `Description: ${project.description || "None"}`,
     `Primary language: ${project.language || "Unspecified"}`,
-    `Visible project files: ${project.files.length}`,
+    `Included source files: ${visibleFiles.length}`,
+    "Sensitive files such as environment files, private keys, and credential files are excluded from AI context.",
     "Project file context follows. Treat it as source-of-truth context for this project.",
-    files || "No project files are available yet.",
+    files || "No safe project files are available yet.",
   ].join("\n\n");
 }
 
