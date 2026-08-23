@@ -17,6 +17,15 @@ function decrypt(value: string) {
   decipher.setAuthTag(Buffer.from(tag, "hex"));
   return Buffer.concat([decipher.update(Buffer.from(cipher, "hex")), decipher.final()]).toString("utf8");
 }
+function tokenFromStored(value: string) {
+  try {
+    const parsed = JSON.parse(value) as { accessToken?: string };
+    if (parsed && typeof parsed.accessToken === "string") return parsed.accessToken;
+  } catch {
+    // Legacy credentials can be stored directly.
+  }
+  return value;
+}
 function parseRepo(value: string) {
   try {
     const url = new URL(value.trim());
@@ -30,7 +39,7 @@ function parseRepo(value: string) {
 }
 async function token(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { githubTokenEnc: true } });
-  return user?.githubTokenEnc ? decrypt(user.githubTokenEnc) : null;
+  return user?.githubTokenEnc ? tokenFromStored(decrypt(user.githubTokenEnc)) : null;
 }
 async function github(url: string, accessToken: string, init: RequestInit = {}) {
   const res = await fetch(url, { ...init, headers: {
