@@ -29,9 +29,7 @@ async function generateGemini(prompt: string) {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-        },
+        generationConfig: {},
       }),
     },
   );
@@ -79,9 +77,8 @@ router.post("/ai/chat", authenticate, async (req, res) => {
     return res.json({ model: GEMINI_MODEL, reply });
   } catch (error) {
     console.error("Gemini chat error:", error);
-    return res.status(502).json({
-      message: error instanceof Error ? error.message : "Unable to run Gemini chat",
-    });
+    const message = error instanceof Error ? error.message : "Unable to run Gemini chat";
+    return res.status(message === "Gemini is not configured on the Devora backend" ? 503 : 502).json({ message });
   }
 });
 
