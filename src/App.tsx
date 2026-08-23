@@ -8,7 +8,9 @@ import Dashboard from "./pages/Dashboard";
 import GitHubHubFinal from "./pages/GitHubHubFinal";
 import GitHubDevWorkspace from "./pages/GitHubDevWorkspace";
 import GitHubDiffViewer from "./pages/GitHubDiffViewer";
+import PullRequestCenter from "./pages/PullRequestCenter";
 import ProjectCommandCenter from "./pages/ProjectCommandCenter";
+import AICodeActions from "./pages/AICodeActions";
 import CodeRunner from "./pages/CodeRunner";
 import Profile from "./pages/Profile";
 import { ActivityPage, AssistantPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
@@ -26,9 +28,11 @@ export default function App() {
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
     <Route path="/projects" element={<Protected><ProjectCommandCenter /></Protected>} />
     <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
+    <Route path="/ai/code" element={<Protected><AICodeActions /></Protected>} />
     <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
     <Route path="/github/repo" element={<Protected><GitHubDevWorkspace /></Protected>} />
     <Route path="/github/diff" element={<Protected><GitHubDiffViewer /></Protected>} />
+    <Route path="/github/prs" element={<Protected><PullRequestCenter /></Protected>} />
     <Route path="/runner" element={<Protected><CodeRunner /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
