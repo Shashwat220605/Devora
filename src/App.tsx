@@ -11,9 +11,10 @@ import GitHubDiffViewer from "./pages/GitHubDiffViewer";
 import PullRequestCenter from "./pages/PullRequestCenter";
 import ProjectCommandCenter from "./pages/ProjectCommandCenter";
 import AICodeActions from "./pages/AICodeActions";
+import AIChat from "./pages/AIChat";
 import CodeRunner from "./pages/CodeRunner";
 import Profile from "./pages/Profile";
-import { ActivityPage, AssistantPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
+import { ActivityPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
 function Protected({ children }: { children: ReactNode }) {
   return localStorage.getItem("devora_token") ? <>{children}</> : <Navigate to="/login" replace />;
@@ -27,7 +28,7 @@ export default function App() {
     <Route path="/signup" element={<Signup />} />
     <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
     <Route path="/projects" element={<Protected><ProjectCommandCenter /></Protected>} />
-    <Route path="/ai" element={<Protected><AssistantPage /></Protected>} />
+    <Route path="/ai" element={<Protected><AIChat /></Protected>} />
     <Route path="/ai/code" element={<Protected><AICodeActions /></Protected>} />
     <Route path="/github" element={<Protected><GitHubHubFinal /></Protected>} />
     <Route path="/github/repo" element={<Protected><GitHubDevWorkspace /></Protected>} />
