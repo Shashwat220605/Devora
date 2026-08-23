@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Bot, Send, Sparkles, User, Wand2 } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
