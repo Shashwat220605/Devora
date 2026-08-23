@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.middleware.js";
+import { getPrisma } from "../lib/prisma.js";
 
 const router = Router();
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const MAX_CONTEXT_FILES = 24;
+const MAX_FILE_CHARS = 10_000;
 
 const actionInstructions: Record<string, string> = {
   explain: "Explain the selected code clearly for a developer. Do not rewrite the code.",
@@ -46,6 +49,54 @@ async function generateGemini(prompt: string) {
   return text;
 }
 
+async function getProjectContext(projectId: string | undefined, userId: string) {
+  if (!projectId) return "";
+
+  const prisma = getPrisma();
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, ownerId: userId },
+    select: {
+      name: true,
+      description: true,
+      language: true,
+      files: {
+        orderBy: { path: "asc" },
+        take: MAX_CONTEXT_FILES,
+        select: { path: true, language: true, content: true },
+      },
+    },
+  });
+
+  if (!project) return "";
+
+  const preferred = [...project.files].sort((a, b) => {
+    const score = (path: string) => {
+      if (path === "package.json") return 100;
+      if (path === "README.md") return 90;
+      if (/^(src|server)\//.test(path)) return 70;
+      if (/(route|api|auth|app|index|main|config)/i.test(path)) return 60;
+      return 20;
+    };
+    return score(b.path) - score(a.path) || a.path.localeCompare(b.path);
+  });
+
+  const files = preferred.map((file) => {
+    const content = file.content.length > MAX_FILE_CHARS
+      ? `${file.content.slice(0, MAX_FILE_CHARS)}\n...[truncated]`
+      : file.content;
+    return `### ${file.path} (${file.language || "plaintext"})\n${content}`;
+  }).join("\n\n");
+
+  return [
+    `Project: ${project.name}`,
+    `Description: ${project.description || "None"}`,
+    `Primary language: ${project.language || "Unspecified"}`,
+    `Visible project files: ${project.files.length}`,
+    "Project file context follows. Treat it as source-of-truth context for this project.",
+    files || "No project files are available yet.",
+  ].join("\n\n");
+}
+
 router.post("/ai/chat", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
@@ -53,6 +104,7 @@ router.post("/ai/chat", authenticate, async (req, res) => {
 
     const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
     const history = Array.isArray(req.body?.history) ? req.body.history : [];
+    const projectId = typeof req.body?.projectId === "string" ? req.body.projectId : undefined;
 
     if (!message) return res.status(400).json({ message: "message is required" });
     if (message.length > 12_000) return res.status(413).json({ message: "Message is too large" });
@@ -63,18 +115,23 @@ router.post("/ai/chat", authenticate, async (req, res) => {
       .map((item: any) => `${item.role === "user" ? "User" : "Devora AI"}: ${item.text.slice(0, 8_000)}`)
       .join("\n");
 
+    const projectContext = await getProjectContext(projectId, userId);
+
     const prompt = [
       "You are Devora AI, an expert software engineering assistant inside the Devora developer workspace.",
       "Be concise but useful. Help with programming, debugging, architecture, Git, testing, APIs, databases, and development workflows.",
+      "When project context is provided, use it actively. Reference concrete filenames and explain why they matter.",
+      "If the requested information is not present in the provided project context, say so instead of pretending you inspected files you cannot see.",
       "When the user asks for code, provide practical code with brief reasoning.",
-      "Never claim you executed code or inspected files unless the request includes the relevant context.",
+      "Never claim you executed code unless the request includes execution output.",
+      projectContext ? `Current project context:\n${projectContext}` : "No project is selected. Answer using only the conversation and the user's message.",
       safeHistory ? `Conversation history:\n${safeHistory}` : "",
       `User: ${message}`,
       "Devora AI:",
     ].filter(Boolean).join("\n\n");
 
     const reply = await generateGemini(prompt);
-    return res.json({ model: GEMINI_MODEL, reply });
+    return res.json({ model: GEMINI_MODEL, reply, projectAware: Boolean(projectContext) });
   } catch (error) {
     console.error("Gemini chat error:", error);
     const message = error instanceof Error ? error.message : "Unable to run Gemini chat";
