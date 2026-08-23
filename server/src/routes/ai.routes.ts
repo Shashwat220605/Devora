@@ -11,6 +11,80 @@ const actionInstructions: Record<string, string> = {
   tests: "Generate practical tests for the selected code. Prefer the existing language and common conventions.",
 };
 
+function getGeminiKey() {
+  return process.env.GEMINI_API_KEY;
+}
+
+async function generateGemini(prompt: string) {
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error("Gemini is not configured on the Devora backend");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+        },
+      }),
+    },
+  );
+
+  const payload = await response.json() as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) throw new Error(payload.error?.message || "Gemini request failed");
+
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
+  if (!text) throw new Error("Gemini returned an empty response");
+  return text;
+}
+
+router.post("/ai/chat", authenticate, async (req, res) => {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    const history = Array.isArray(req.body?.history) ? req.body.history : [];
+
+    if (!message) return res.status(400).json({ message: "message is required" });
+    if (message.length > 12_000) return res.status(413).json({ message: "Message is too large" });
+
+    const safeHistory = history
+      .filter((item: any) => item && (item.role === "user" || item.role === "assistant") && typeof item.text === "string")
+      .slice(-12)
+      .map((item: any) => `${item.role === "user" ? "User" : "Devora AI"}: ${item.text.slice(0, 8_000)}`)
+      .join("\n");
+
+    const prompt = [
+      "You are Devora AI, an expert software engineering assistant inside the Devora developer workspace.",
+      "Be concise but useful. Help with programming, debugging, architecture, Git, testing, APIs, databases, and development workflows.",
+      "When the user asks for code, provide practical code with brief reasoning.",
+      "Never claim you executed code or inspected files unless the request includes the relevant context.",
+      safeHistory ? `Conversation history:\n${safeHistory}` : "",
+      `User: ${message}`,
+      "Devora AI:",
+    ].filter(Boolean).join("\n\n");
+
+    const reply = await generateGemini(prompt);
+    return res.json({ model: GEMINI_MODEL, reply });
+  } catch (error) {
+    console.error("Gemini chat error:", error);
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : "Unable to run Gemini chat",
+    });
+  }
+});
+
 router.post("/ai/code-action", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
@@ -27,11 +101,6 @@ router.post("/ai/code-action", authenticate, async (req, res) => {
       return res.status(413).json({ message: "Selected file is too large for an AI action" });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(503).json({ message: "Gemini is not configured on the Devora backend" });
-    }
-
     const prompt = [
       "You are Devora AI, a careful software engineering assistant.",
       actionInstructions[action as string],
@@ -46,44 +115,7 @@ router.post("/ai/code-action", authenticate, async (req, res) => {
       content,
     ].join("\n\n");
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                explanation: { type: "STRING" },
-                result: { type: "STRING" },
-              },
-              required: ["explanation", "result"],
-            },
-          },
-        }),
-      },
-    );
-
-    const payload = await response.json() as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      error?: { message?: string };
-    };
-
-    if (!response.ok) {
-      return res.status(502).json({
-        message: payload.error?.message || "Gemini request failed",
-      });
-    }
-
-    const raw = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
-    if (!raw) return res.status(502).json({ message: "Gemini returned an empty response" });
+    const raw = await generateGemini(prompt);
 
     let result: { explanation: string; result: string };
     try {
@@ -100,9 +132,8 @@ router.post("/ai/code-action", authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error("Gemini code action error:", error);
-    return res.status(502).json({
-      message: error instanceof Error ? error.message : "Unable to run Gemini code action",
-    });
+    const message = error instanceof Error ? error.message : "Unable to run Gemini code action";
+    return res.status(message === "Gemini is not configured on the Devora backend" ? 503 : 502).json({ message });
   }
 });
 
