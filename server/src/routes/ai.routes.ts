@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.middleware.js";
 
 const router = Router();
-const GEMINI_MODEL = "gemini-3.7-flash";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 const actionInstructions: Record<string, string> = {
   explain: "Explain the selected code clearly for a developer. Do not rewrite the code.",
