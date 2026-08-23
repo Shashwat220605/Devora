@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Check, FileCode2, Lightbulb, RefreshCw, Sparkles, Wand2, X } from "lucide-react";
+import { Bot, FileCode2, Lightbulb, RefreshCw, Sparkles, Wand2, X } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
 
