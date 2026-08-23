@@ -10,7 +10,6 @@ import {
   GitBranch,
   LayoutDashboard,
   LogOut,
-  Pickaxe,
   Settings,
   Terminal,
   UserRound,
@@ -85,8 +84,8 @@ export default function Layout({ children, active }: LayoutProps) {
             onClick={() => navigate("/dashboard")}
             className="mb-7 flex items-center gap-3 rounded-xl p-2 text-left hover:bg-white/[0.04]"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black">
-              <Pickaxe size={19} strokeWidth={2.2} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black overflow-hidden">
+              <img src="/favicon.svg" alt="Devora" className="h-10 w-10 object-cover" />
             </div>
             <div>
               <p className="font-semibold">Devora</p>
