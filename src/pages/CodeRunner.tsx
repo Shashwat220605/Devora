@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Code2, Play, RotateCcw, SquareTerminal, Trash2 } from "lucide-react";
+import { Bot, Code2, Play, RotateCcw, Sparkles, SquareTerminal, Trash2 } from "lucide-react";
 import Layout from "./Layout";
+import api from "../services/api";
 
 type Language = "javascript" | "html" | "css";
 type LogType = "log" | "error" | "result";
 type LogItem = { type: LogType; text: string };
+type ErrorDoctorResult = {
+  model: string;
+  summary: string;
+  cause: string;
+  fix: string;
+  suggestedCode: string;
+  confidence: "high" | "medium" | "low";
+  projectAware: boolean;
+};
 
 const starterCode: Record<Language, string> = {
   javascript: `const name = "Devora";
@@ -95,9 +105,17 @@ export default function CodeRunner() {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [running, setRunning] = useState(false);
   const [preview, setPreview] = useState("");
+  const [doctor, setDoctor] = useState<ErrorDoctorResult | null>(null);
+  const [doctorBusy, setDoctorBusy] = useState(false);
+  const [doctorError, setDoctorError] = useState("");
 
   const frameRef = useRef<HTMLIFrameElement>(null);
   const timeoutRef = useRef<number | null>(null);
+
+  const latestError = useMemo(
+    () => [...logs].reverse().find((item) => item.type === "error")?.text || "",
+    [logs],
+  );
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -142,6 +160,8 @@ export default function CodeRunner() {
     setCode(starterCode[next]);
     setLogs([]);
     setPreview("");
+    setDoctor(null);
+    setDoctorError("");
     setRunning(false);
 
     if (timeoutRef.current !== null) {
@@ -155,6 +175,8 @@ export default function CodeRunner() {
   const clear = () => {
     setLogs([]);
     setPreview("");
+    setDoctor(null);
+    setDoctorError("");
   };
 
   const stop = () => {
@@ -206,6 +228,33 @@ export default function CodeRunner() {
     }
 
     frameRef.current.srcdoc = buildJavaScriptSandbox(code);
+  };
+
+  const diagnoseError = async () => {
+    if (!latestError) return;
+
+    try {
+      setDoctorBusy(true);
+      setDoctorError("");
+      const response = await api.post<ErrorDoctorResult>("/ai/error-doctor", {
+        error: latestError,
+        code,
+        language,
+      });
+      setDoctor(response.data);
+    } catch (err: any) {
+      setDoctorError(err.response?.data?.message || "Unable to diagnose this error.");
+    } finally {
+      setDoctorBusy(false);
+    }
+  };
+
+  const useSuggestedCode = () => {
+    if (!doctor?.suggestedCode) return;
+    setCode(doctor.suggestedCode);
+    setLogs([]);
+    setDoctor(null);
+    setDoctorError("");
   };
 
   return (
@@ -278,12 +327,24 @@ export default function CodeRunner() {
               <p className="flex items-center gap-2 text-sm font-medium">
                 <SquareTerminal size={15} /> Console
               </p>
-              <button
-                onClick={clear}
-                className="inline-flex items-center gap-2 text-xs text-zinc-500 hover:text-white"
-              >
-                <Trash2 size={13} /> Clear
-              </button>
+              <div className="flex items-center gap-3">
+                {latestError && (
+                  <button
+                    onClick={() => void diagnoseError()}
+                    disabled={doctorBusy}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40"
+                  >
+                    {doctorBusy ? <Sparkles size={13} className="animate-pulse" /> : <Bot size={13} />}
+                    {doctorBusy ? "Diagnosing..." : "Ask Devora"}
+                  </button>
+                )}
+                <button
+                  onClick={clear}
+                  className="inline-flex items-center gap-2 text-xs text-zinc-500 hover:text-white"
+                >
+                  <Trash2 size={13} /> Clear
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 min-h-[230px] max-h-[330px] overflow-auto rounded-xl border border-white/10 bg-black/30 p-4 font-mono text-xs leading-6">
@@ -319,6 +380,34 @@ export default function CodeRunner() {
                 />
               </div>
             </div>
+          )}
+
+          {doctor && (
+            <div className="rounded-2xl border border-white/10 bg-[#0f0f12] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium"><Bot size={15} /> Error Doctor</div>
+                  <p className="mt-1 text-xs text-zinc-500">{doctor.confidence} confidence · {doctor.model}{doctor.projectAware ? " · project-aware" : ""}</p>
+                </div>
+                <button onClick={() => setDoctor(null)} className="text-xs text-zinc-600 hover:text-white">Close</button>
+              </div>
+
+              <div className="mt-4 space-y-3 text-sm">
+                <div><p className="text-xs uppercase tracking-[0.16em] text-zinc-600">Summary</p><p className="mt-1 text-zinc-200">{doctor.summary}</p></div>
+                <div><p className="text-xs uppercase tracking-[0.16em] text-zinc-600">Cause</p><p className="mt-1 leading-6 text-zinc-400">{doctor.cause}</p></div>
+                <div><p className="text-xs uppercase tracking-[0.16em] text-zinc-600">Fix</p><p className="mt-1 leading-6 text-zinc-400">{doctor.fix}</p></div>
+              </div>
+
+              {doctor.suggestedCode && (
+                <button onClick={useSuggestedCode} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black">
+                  <Sparkles size={14} /> Use suggested code
+                </button>
+              )}
+            </div>
+          )}
+
+          {doctorError && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{doctorError}</div>
           )}
 
           <iframe
