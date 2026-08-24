@@ -144,6 +144,57 @@ router.post("/ai/chat", authenticate, async (req, res) => {
   }
 });
 
+router.post("/ai/error-doctor", authenticate, async (req, res) => {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+
+    const errorText = typeof req.body?.error === "string" ? req.body.error.trim() : "";
+    const code = typeof req.body?.code === "string" ? req.body.code : "";
+    const language = typeof req.body?.language === "string" ? req.body.language : "unknown";
+    const projectId = typeof req.body?.projectId === "string" ? req.body.projectId : undefined;
+
+    if (!errorText) return res.status(400).json({ message: "error is required" });
+    if (errorText.length > 16_000) return res.status(413).json({ message: "Error output is too large" });
+    if (code.length > 100_000) return res.status(413).json({ message: "Code is too large" });
+
+    const projectContext = await getProjectContext(projectId, userId);
+    const prompt = [
+      "You are Devora Error Doctor, a senior software engineer diagnosing a runtime or build error.",
+      "Use the error output as the primary evidence. Use the code and project context to identify the most likely cause.",
+      "Return JSON only with exactly these fields:",
+      '{"summary":"string","cause":"string","fix":"string","suggestedCode":"string","confidence":"high|medium|low"}',
+      "suggestedCode must be the complete replacement for the provided code when a code change is clearly appropriate. Otherwise return an empty string.",
+      "Do not invent files, logs, execution results, or dependencies.",
+      `Language: ${language}`,
+      `Error output:\n${errorText}`,
+      code ? `Current code:\n${code}` : "No source code was supplied.",
+      projectContext ? `Project context:\n${projectContext}` : "No project context was supplied.",
+    ].join("\n\n");
+
+    const raw = await generateGemini(prompt);
+    let result: {
+      summary: string;
+      cause: string;
+      fix: string;
+      suggestedCode: string;
+      confidence: "high" | "medium" | "low";
+    };
+
+    try {
+      result = JSON.parse(raw);
+    } catch {
+      return res.status(502).json({ message: "Gemini returned invalid error-doctor output" });
+    }
+
+    return res.json({ model: GEMINI_MODEL, ...result, projectAware: Boolean(projectContext) });
+  } catch (error) {
+    console.error("Gemini error doctor error:", error);
+    const message = error instanceof Error ? error.message : "Unable to diagnose the error";
+    return res.status(message === "Gemini is not configured on the Devora backend" ? 503 : 502).json({ message });
+  }
+});
+
 router.post("/ai/code-action", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
