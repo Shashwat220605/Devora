@@ -6,6 +6,7 @@ import {
   Bell,
   Bot,
   Check,
+  Cloud,
   FolderGit2,
   GitBranch,
   GitCommitHorizontal,
@@ -33,6 +34,7 @@ const items = [
   { label: "AI Assistant", path: "/ai", icon: Bot },
   { label: "GitHub", path: "/github", icon: GitBranch },
   { label: "Source Control", path: "/source-control", icon: GitCommitHorizontal },
+  { label: "Deployments", path: "/deployments", icon: Cloud },
   { label: "Terminal", path: "/terminal", icon: Terminal },
   { label: "Activity", path: "/activity", icon: Activity },
   { label: "Settings", path: "/settings", icon: Settings },
@@ -85,7 +87,7 @@ export default function Layout({ children, active }: LayoutProps) {
             <div><p className="font-semibold">Devora</p><p className="text-xs text-zinc-500">AI Developer Workspace</p></div>
           </button>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 overflow-y-auto">
             {items.map(({ label, path, icon: Icon }) => {
               const isActive = active === label || (!active && location.pathname === path);
               return <button key={label} onClick={() => navigate(path)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${isActive ? "bg-white text-black" : "text-zinc-400 hover:bg-white/[0.05] hover:text-white"}`}><Icon size={17} />{label}</button>;
