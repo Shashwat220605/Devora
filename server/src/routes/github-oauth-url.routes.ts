@@ -25,7 +25,7 @@ function createOAuthState(userId: string) {
     JSON.stringify({
       userId,
       issuedAt: Date.now(),
-      nonce: crypto.randomBytes(18).toString("hex"),
+      nonce: Buffer.from(crypto.randomBytes(18)).toString("hex"),
     }),
   );
 
