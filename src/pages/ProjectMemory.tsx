@@ -25,7 +25,6 @@ export default function ProjectMemory() {
   const [category, setCategory] = useState<Category>("architecture");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -45,24 +44,15 @@ export default function ProjectMemory() {
   const loadMemory = async () => {
     if (!projectId) return;
     try {
-      setLoading(true);
       setError("");
       const response = await api.get<Memory[]>(`/projects/${projectId}/memory`);
       setMemories(response.data);
-      setSelectedId(response.data[0]?.id || null);
       const first = response.data[0];
-      if (first) {
-        setCategory(first.category);
-        setTitle(first.title);
-        setContent(first.content);
-      } else {
-        clearForm();
-      }
+      if (first) selectMemory(first);
+      else clearForm();
     } catch (err: any) {
       setError(err.response?.data?.message || "Unable to load project memory.");
       setMemories([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -152,7 +142,7 @@ export default function ProjectMemory() {
             <div className="flex items-center gap-2"><Brain size={17}/><span className="font-medium">Memory bank</span><span className="ml-auto text-xs text-zinc-600">{memories.length}</span></div>
             <div className="mt-4 space-y-4">
               {grouped.length === 0 && <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-zinc-600">No memory yet. Add the first piece of project context.</div>}
-              {grouped.map((group) => <div key={group.id}><p className="px-1 text-[10px] uppercase tracking-[0.18em] text-zinc-600">{group.label}</p><div className="mt-2 space-y-1">{group.items.map((memory) => <button key={memory.id} onClick={() => selectMemory(memory)} className={`w-full rounded-xl px-3 py-3 text-left ${selectedId === memory.id ? "bg-white text-black" : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"}`}><p className="truncate text-sm font-medium">{memory.title}</p><p className={`mt-1 line-clamp-2 text-[11px] ${selectedId === memory.id ? "text-zinc-600" : "text-zinc-600"}`}>{memory.content}</p></button>)}</div></div>)}
+              {grouped.map((group) => <div key={group.id}><p className="px-1 text-[10px] uppercase tracking-[0.18em] text-zinc-600">{group.label}</p><div className="mt-2 space-y-1">{group.items.map((memory) => <button key={memory.id} onClick={() => selectMemory(memory)} className={`w-full rounded-xl px-3 py-3 text-left ${selectedId === memory.id ? "bg-white text-black" : "text-zinc-400 hover:bg-white/[0.04] hover:text-white"}`}><p className="truncate text-sm font-medium">{memory.title}</p><p className="mt-1 line-clamp-2 text-[11px] text-zinc-600">{memory.content}</p></button>)}</div></div>)}
             </div>
           </aside>
 
