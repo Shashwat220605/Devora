@@ -100,13 +100,6 @@ Browser-based execution for basic languages:
 
 JavaScript executes inside an isolated browser sandbox with console output, errors, result capture, and a timeout.
 
-## 🧪 Related Project
-
-Devora is part of a growing set of developer-focused projects. You can also explore the interactive 3D periodic table website:
-
-**[🧪 Interactive 3D Periodic Table](https://periodic-table-3-d.vercel.app/)**  
-[Open the live periodic table website](https://periodic-table-3-d.vercel.app/)
-
 ## 🧱 Tech Stack
 
 ### Frontend
