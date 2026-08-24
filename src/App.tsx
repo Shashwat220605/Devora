@@ -15,6 +15,7 @@ import AIChat from "./pages/AIChat";
 import CodeRunner from "./pages/CodeRunner";
 import SourceControl from "./pages/SourceControl";
 import DeploymentCenter from "./pages/DeploymentCenter";
+import ProjectMemory from "./pages/ProjectMemory";
 import Profile from "./pages/Profile";
 import { ActivityPage, SettingsPage, TerminalPage } from "./pages/ToolPages";
 
@@ -38,6 +39,7 @@ export default function App() {
     <Route path="/github/prs" element={<Protected><PullRequestCenter /></Protected>} />
     <Route path="/source-control" element={<Protected><SourceControl /></Protected>} />
     <Route path="/deployments" element={<Protected><DeploymentCenter /></Protected>} />
+    <Route path="/memory" element={<Protected><ProjectMemory /></Protected>} />
     <Route path="/runner" element={<Protected><CodeRunner /></Protected>} />
     <Route path="/terminal" element={<Protected><TerminalPage /></Protected>} />
     <Route path="/activity" element={<Protected><ActivityPage /></Protected>} />
