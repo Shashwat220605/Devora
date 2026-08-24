@@ -14,11 +14,10 @@ import githubDevtoolsRoutes from "./routes/github-devtools.routes.js";
 import githubDiffRoutes from "./routes/github-diff.routes.js";
 import githubDiffViewerRoutes from "./routes/github-diff-viewer.routes.js";
 import githubSyncRoutes from "./routes/github-sync.routes.js";
-import githubSourceControlRoutes from "./routes/github-source-control.routes.js";
 import githubPrRoutes from "./routes/github-pr.routes.js";
 import githubReposRoutes from "./routes/github-repos.routes.js";
+import deploymentRoutes from "./routes/deployment.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
-import aiCommitRoutes from "./routes/ai-commit.routes.js";
 
 const app = express();
 
@@ -71,10 +70,9 @@ app.use("/api", githubDevtoolsRoutes);
 app.use("/api", githubDiffRoutes);
 app.use("/api", githubDiffViewerRoutes);
 app.use("/api", githubSyncRoutes);
-app.use("/api", githubSourceControlRoutes);
 app.use("/api", githubPrRoutes);
+app.use("/api", deploymentRoutes);
 app.use("/api", aiRoutes);
-app.use("/api", aiCommitRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({
