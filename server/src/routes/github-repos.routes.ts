@@ -49,7 +49,7 @@ function encrypt(value: string) {
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return `${iv.toString("hex")}:${tag.toString("hex")}:${ciphertext.toString("hex")}`;
+  return `${Buffer.from(iv).toString("hex")}:${Buffer.from(tag).toString("hex")}:${Buffer.from(ciphertext).toString("hex")}`;
 }
 
 async function refreshTokenIfNeeded(userId: string, credentials: StoredGitHubCredentials) {
