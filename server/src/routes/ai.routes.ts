@@ -236,6 +236,78 @@ router.post("/ai/error-doctor", authenticate, async (req, res) => {
   }
 });
 
+router.post("/ai/pr-review", authenticate, async (req, res) => {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+
+    const title = typeof req.body?.title === "string" ? req.body.title.slice(0, 300) : "";
+    const body = typeof req.body?.body === "string" ? req.body.body.slice(0, 6_000) : "";
+    const files = Array.isArray(req.body?.files) ? req.body.files : [];
+    const projectId = typeof req.body?.projectId === "string" ? req.body.projectId : undefined;
+
+    if (!title) return res.status(400).json({ message: "Pull request title is required" });
+    if (files.length > 100) return res.status(413).json({ message: "Too many changed files" });
+
+    const normalizedFiles = files.slice(0, 60).map((file: any) => ({
+      path: String(file?.path || "").slice(0, 300),
+      status: String(file?.status || "unknown"),
+      additions: Number(file?.additions || 0),
+      deletions: Number(file?.deletions || 0),
+      patch: typeof file?.patch === "string" ? file.patch.slice(0, 8_000) : "",
+    }));
+    const projectContext = await getProjectContext(projectId, userId);
+
+    const prompt = [
+      "You are Devora AI Code Review, reviewing a GitHub pull request before merge.",
+      "Prioritize correctness, security, breaking changes, missing tests, and meaningful maintainability risks.",
+      "Do not invent issues. If the patch is clean, say so.",
+      "Return ONLY one valid JSON object with exactly these keys: summary, risk, findings, recommendation.",
+      "risk must be exactly one of low, medium, high.",
+      "findings must be an array of objects with exactly: severity, file, title, detail, suggestion.",
+      "severity must be exactly one of blocker, warning, suggestion, info.",
+      "recommendation must be a short actionable review conclusion.",
+      `Pull request title: ${title}`,
+      `Pull request description: ${body || "None"}`,
+      `Changed files:\n${JSON.stringify(normalizedFiles)}`,
+      projectContext ? `Project context:\n${projectContext}` : "No project context was supplied.",
+    ].join("\n\n");
+
+    const raw = await generateGemini(prompt);
+    const parsed = parseGeminiJson<{
+      summary?: unknown;
+      risk?: unknown;
+      findings?: unknown;
+      recommendation?: unknown;
+    }>(raw);
+
+    if (!parsed) return res.status(502).json({ message: "Gemini returned invalid code-review output" });
+
+    const riskValue = String(parsed.risk || "medium").toLowerCase();
+    const risk = riskValue === "high" || riskValue === "low" ? riskValue : "medium";
+    const findings = Array.isArray(parsed.findings) ? parsed.findings.slice(0, 40).map((item: any) => ({
+      severity: ["blocker", "warning", "suggestion", "info"].includes(String(item?.severity)) ? String(item.severity) : "info",
+      file: String(item?.file || "").slice(0, 300),
+      title: String(item?.title || "Finding").slice(0, 200),
+      detail: String(item?.detail || "").slice(0, 2000),
+      suggestion: String(item?.suggestion || "").slice(0, 2000),
+    })) : [];
+
+    return res.json({
+      model: GEMINI_MODEL,
+      projectAware: Boolean(projectContext),
+      summary: String(parsed.summary || "Review completed."),
+      risk,
+      findings,
+      recommendation: String(parsed.recommendation || "Review the findings before merging."),
+    });
+  } catch (error) {
+    console.error("Gemini PR review error:", error);
+    const message = error instanceof Error ? error.message : "Unable to review pull request";
+    return res.status(message === "Gemini is not configured on the Devora backend" ? 503 : 502).json({ message });
+  }
+});
+
 router.post("/ai/code-action", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
