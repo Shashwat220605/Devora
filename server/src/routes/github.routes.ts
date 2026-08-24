@@ -8,8 +8,20 @@ import {
 
 const router = Router();
 
-const MAX_FILES = 150;
+const MAX_FILES = 500;
 const MAX_FILE_BYTES = 1_000_000;
+const IGNORED_PATHS = [
+  /^\.git\//i,
+  /(^|\/)node_modules\//i,
+  /(^|\/)dist\//i,
+  /(^|\/)build\//i,
+  /(^|\/)coverage\//i,
+  /(^|\/)\.next\//i,
+  /(^|\/)\.vite\//i,
+  /(^|\/)\.turbo\//i,
+  /(^|\/)\.cache\//i,
+  /(^|\/)out\//i,
+];
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const OAUTH_CLIENT_ID = process.env.GITHUB_OAUTH_CLIENT_ID;
 const OAUTH_CLIENT_SECRET = process.env.GITHUB_OAUTH_CLIENT_SECRET;
@@ -139,6 +151,10 @@ function parseGitHubUrl(value: string) {
   } catch {
     return null;
   }
+}
+
+function shouldIgnorePath(path: string) {
+  return IGNORED_PATHS.some((pattern) => pattern.test(path));
 }
 
 async function githubRequest(url: string, token?: string, init: RequestInit = {}) {
@@ -446,7 +462,9 @@ router.get("/github/repos", authenticate, async (req, res) => {
     return res.json(repos);
   } catch (error) {
     console.error("GitHub repos error:", error);
-    return res.status(502).json({ message: "Unable to load GitHub repositories" });
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : "Unable to load GitHub repositories",
+    });
   }
 });
 
@@ -488,13 +506,19 @@ router.post("/github/import", authenticate, async (req, res) => {
     const blobs = (treeData.tree || []).filter(
       (item) =>
         item.type === "blob" &&
-        !item.path.startsWith(".git/") &&
+        !shouldIgnorePath(item.path) &&
         (item.size ?? 0) <= MAX_FILE_BYTES,
     );
 
-    if (treeData.truncated || blobs.length > MAX_FILES) {
+    if (treeData.truncated) {
       return res.status(413).json({
-        message: `Repository is too large to import. Limit is ${MAX_FILES} files under ${MAX_FILE_BYTES / 1_000_000} MB each.`,
+        message: "GitHub returned a truncated repository tree. This repository is too large to import in one pass. Try a smaller repository or exclude generated folders before importing.",
+      });
+    }
+
+    if (blobs.length > MAX_FILES) {
+      return res.status(413).json({
+        message: `Repository has ${blobs.length} importable files. Devora currently supports ${MAX_FILES} files per import after excluding generated folders such as node_modules, dist, build, and coverage.`,
       });
     }
 
@@ -546,102 +570,9 @@ router.post("/github/import", authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error("GitHub import error:", error);
-    return res.status(502).json({ message: "Unable to import the GitHub repository" });
-  }
-});
-
-router.post("/github/push", authenticate, async (req, res) => {
-  try {
-    const userId = (req as AuthenticatedRequest).userId;
-    if (!userId) return res.status(401).json({ message: "Authentication required" });
-
-    const { projectId, repositoryUrl, branch } = req.body;
-    if (typeof projectId !== "string" || typeof repositoryUrl !== "string") {
-      return res.status(400).json({ message: "projectId and repositoryUrl are required" });
-    }
-
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, ownerId: userId },
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : "Unable to import the GitHub repository",
     });
-    if (!project) return res.status(404).json({ message: "Project not found" });
-
-    const token = await getConnectedToken(userId);
-    if (!token) return res.status(401).json({ message: "Connect GitHub first" });
-
-    const parsed = parseGitHubUrl(repositoryUrl);
-    if (!parsed) return res.status(400).json({ message: "Enter a valid GitHub repository URL" });
-
-    const apiBase = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`;
-    const repoData = (await githubRequest(apiBase, token)) as { default_branch?: string };
-    const targetBranch = typeof branch === "string" && branch.trim() ? branch.trim() : repoData.default_branch || "main";
-
-    const refData = (await githubRequest(`${apiBase}/git/ref/heads/${encodeURIComponent(targetBranch)}`, token)) as {
-      object?: { sha?: string };
-    };
-    const parentSha = refData.object?.sha;
-    if (!parentSha) return res.status(400).json({ message: "Unable to resolve the target branch" });
-
-    const commitData = (await githubRequest(`${apiBase}/git/commits/${parentSha}`, token)) as {
-      tree?: { sha?: string };
-    };
-    const baseTreeSha = commitData.tree?.sha;
-    if (!baseTreeSha) return res.status(400).json({ message: "Unable to resolve the target tree" });
-
-    const files = await prisma.projectFile.findMany({
-      where: { projectId },
-      orderBy: { path: "asc" },
-    });
-
-    if (files.length > MAX_FILES) {
-      return res.status(413).json({ message: `Project exceeds the ${MAX_FILES}-file push limit` });
-    }
-
-    const tree: Array<{ path: string; mode: "100644"; type: "blob"; sha: string }> = [];
-    for (const file of files) {
-      if (Buffer.byteLength(file.content, "utf8") > MAX_FILE_BYTES) {
-        return res.status(413).json({ message: `File ${file.path} exceeds the ${MAX_FILE_BYTES / 1_000_000} MB limit` });
-      }
-
-      const blob = (await githubRequest(`${apiBase}/git/blobs`, token, {
-        method: "POST",
-        body: JSON.stringify({ content: Buffer.from(file.content, "utf8").toString("base64"), encoding: "base64" }),
-      })) as { sha?: string };
-      if (!blob.sha) throw new Error(`Failed to create GitHub blob for ${file.path}`);
-      tree.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
-    }
-
-    const treeData = (await githubRequest(`${apiBase}/git/trees`, token, {
-      method: "POST",
-      body: JSON.stringify({ base_tree: baseTreeSha, tree }),
-    })) as { sha?: string };
-    if (!treeData.sha) return res.status(502).json({ message: "Failed to create Git tree" });
-
-    const newCommit = (await githubRequest(`${apiBase}/git/commits`, token, {
-      method: "POST",
-      body: JSON.stringify({
-        message: `Devora sync: ${project.name}`,
-        tree: treeData.sha,
-        parents: [parentSha],
-      }),
-    })) as { sha?: string; html_url?: string };
-    if (!newCommit.sha) return res.status(502).json({ message: "Failed to create Git commit" });
-
-    await githubRequest(`${apiBase}/git/refs/heads/${encodeURIComponent(targetBranch)}`, token, {
-      method: "PATCH",
-      body: JSON.stringify({ sha: newCommit.sha, force: false }),
-    });
-
-    return res.json({
-      message: "Changes pushed to GitHub",
-      branch: targetBranch,
-      commitSha: newCommit.sha,
-      commitUrl: newCommit.html_url || null,
-      filesPushed: files.length,
-      frontendUrl: FRONTEND_URL,
-    });
-  } catch (error) {
-    console.error("GitHub push error:", error);
-    return res.status(502).json({ message: "Unable to push changes to GitHub" });
   }
 });
 
