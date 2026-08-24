@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Check, FileCode2, GitBranch, Loader2, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import { Bot, FileCode2, GitBranch, Loader2, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
 
@@ -44,10 +44,7 @@ export default function SourceControl() {
   useEffect(() => { void loadProjects().catch(() => setError("Unable to load projects.")); }, []);
   useEffect(() => { void loadChanges(); }, [projectId]);
 
-  const selectedChanges = useMemo(
-    () => data?.changes.filter((change) => selected.includes(change.path)) || [],
-    [data, selected],
-  );
+  const selectedChanges = useMemo(() => data?.changes.filter((change) => selected.includes(change.path)) || [], [data, selected]);
 
   const generateMessage = async () => {
     if (!projectId || selectedChanges.length === 0) return;
