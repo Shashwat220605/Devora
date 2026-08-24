@@ -4,6 +4,10 @@
 
 Devora is a developer workspace that brings everyday software-engineering tasks into one interface. It combines an AI coding assistant with project-aware context, code execution, GitHub workflows, source control, pull-request tooling, deployment checks, and persistent project memory.
 
+## 🌐 Live Demo
+
+**Devora:** [Open Devora](https://devora-rose.vercel.app/)
+
 ## ✨ What Devora Includes
 
 ### 🤖 AI Assistant
@@ -95,6 +99,13 @@ Browser-based execution for basic languages:
 - CSS
 
 JavaScript executes inside an isolated browser sandbox with console output, errors, result capture, and a timeout.
+
+## 🧪 Related Project
+
+Devora is part of a growing set of developer-focused projects. You can also explore the interactive 3D periodic table website:
+
+**[🧪 Interactive 3D Periodic Table](https://periodic-table-3-d.vercel.app/)**  
+[Open the live periodic table website](https://periodic-table-3-d.vercel.app/)
 
 ## 🧱 Tech Stack
 
