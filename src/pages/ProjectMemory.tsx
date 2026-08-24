@@ -35,6 +35,21 @@ export default function ProjectMemory() {
     [memories],
   );
 
+  const clearForm = () => {
+    setSelectedId(null);
+    setCategory("architecture");
+    setTitle("");
+    setContent("");
+  };
+
+  const selectMemory = (memory: Memory) => {
+    setSelectedId(memory.id);
+    setCategory(memory.category);
+    setTitle(memory.title);
+    setContent(memory.content);
+    setNotice("");
+  };
+
   const loadProjects = async () => {
     const response = await api.get<Project[]>("/projects");
     setProjects(response.data);
@@ -58,21 +73,6 @@ export default function ProjectMemory() {
 
   useEffect(() => { void loadProjects().catch(() => setError("Unable to load projects.")); }, []);
   useEffect(() => { void loadMemory(); }, [projectId]);
-
-  const clearForm = () => {
-    setSelectedId(null);
-    setCategory("architecture");
-    setTitle("");
-    setContent("");
-  };
-
-  const selectMemory = (memory: Memory) => {
-    setSelectedId(memory.id);
-    setCategory(memory.category);
-    setTitle(memory.title);
-    setContent(memory.content);
-    setNotice("");
-  };
 
   const save = async () => {
     if (!projectId || !title.trim() || !content.trim()) return;
