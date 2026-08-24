@@ -58,6 +58,7 @@ app.use("/api", fileRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api", githubStatusRoutes);
+app.use("/api", githubReposRoutes);
 app.use("/api", githubRoutes);
 app.use("/api", githubRepoRoutes);
 app.use("/api", githubOAuthRoutes);
@@ -69,7 +70,6 @@ app.use("/api", githubDiffRoutes);
 app.use("/api", githubDiffViewerRoutes);
 app.use("/api", githubSyncRoutes);
 app.use("/api", githubPrRoutes);
-app.use("/api", githubReposRoutes);
 app.use("/api", aiRoutes);
 
 app.get("/api/health", (_req, res) => {
