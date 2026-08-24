@@ -50,6 +50,38 @@ async function generateGemini(prompt: string) {
   return text;
 }
 
+function parseGeminiJson<T>(raw: string): T | null {
+  const candidates = [
+    raw.trim(),
+    raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim(),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch {
+      // Try the next normalized form.
+    }
+  }
+
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(raw.slice(firstBrace, lastBrace + 1)) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function normalizeConfidence(value: unknown): "high" | "medium" | "low" {
+  const normalized = String(value || "").toLowerCase();
+  return normalized === "high" || normalized === "low" ? normalized : "medium";
+}
+
 async function getProjectContext(projectId: string | undefined, userId: string) {
   if (!projectId) return "";
 
@@ -162,8 +194,10 @@ router.post("/ai/error-doctor", authenticate, async (req, res) => {
     const prompt = [
       "You are Devora Error Doctor, a senior software engineer diagnosing a runtime or build error.",
       "Use the error output as the primary evidence. Use the code and project context to identify the most likely cause.",
-      "Return JSON only with exactly these fields:",
-      '{"summary":"string","cause":"string","fix":"string","suggestedCode":"string","confidence":"high|medium|low"}',
+      "Return ONLY a single valid JSON object. Do not use Markdown fences, headings, commentary, or code blocks.",
+      "The JSON must contain exactly these keys: summary, cause, fix, suggestedCode, confidence.",
+      "confidence must be exactly one of: high, medium, low.",
+      "Escape all newlines and quotes correctly so the response can be parsed by JSON.parse.",
       "suggestedCode must be the complete replacement for the provided code when a code change is clearly appropriate. Otherwise return an empty string.",
       "Do not invent files, logs, execution results, or dependencies.",
       `Language: ${language}`,
@@ -173,21 +207,28 @@ router.post("/ai/error-doctor", authenticate, async (req, res) => {
     ].join("\n\n");
 
     const raw = await generateGemini(prompt);
-    let result: {
-      summary: string;
-      cause: string;
-      fix: string;
-      suggestedCode: string;
-      confidence: "high" | "medium" | "low";
-    };
+    const parsed = parseGeminiJson<{
+      summary?: unknown;
+      cause?: unknown;
+      fix?: unknown;
+      suggestedCode?: unknown;
+      confidence?: unknown;
+    }>(raw);
 
-    try {
-      result = JSON.parse(raw);
-    } catch {
+    if (!parsed) {
+      console.error("Gemini error doctor returned non-JSON output", { preview: raw.slice(0, 500) });
       return res.status(502).json({ message: "Gemini returned invalid error-doctor output" });
     }
 
-    return res.json({ model: GEMINI_MODEL, ...result, projectAware: Boolean(projectContext) });
+    return res.json({
+      model: GEMINI_MODEL,
+      summary: String(parsed.summary || "Unable to summarize the error."),
+      cause: String(parsed.cause || "Gemini could not determine a reliable cause."),
+      fix: String(parsed.fix || "Try reproducing the error with the smallest failing example."),
+      suggestedCode: typeof parsed.suggestedCode === "string" ? parsed.suggestedCode : "",
+      confidence: normalizeConfidence(parsed.confidence),
+      projectAware: Boolean(projectContext),
+    });
   } catch (error) {
     console.error("Gemini error doctor error:", error);
     const message = error instanceof Error ? error.message : "Unable to diagnose the error";
@@ -226,19 +267,17 @@ router.post("/ai/code-action", authenticate, async (req, res) => {
     ].join("\n\n");
 
     const raw = await generateGemini(prompt);
+    const result = parseGeminiJson<{ explanation?: unknown; result?: unknown }>(raw);
 
-    let result: { explanation: string; result: string };
-    try {
-      result = JSON.parse(raw);
-    } catch {
+    if (!result) {
       return res.status(502).json({ message: "Gemini returned invalid structured output" });
     }
 
     return res.json({
       model: GEMINI_MODEL,
       action,
-      explanation: result.explanation || "",
-      result: result.result || "",
+      explanation: String(result.explanation || ""),
+      result: String(result.result || ""),
     });
   } catch (error) {
     console.error("Gemini code action error:", error);
