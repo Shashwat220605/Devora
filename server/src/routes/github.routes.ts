@@ -295,15 +295,11 @@ function oauthErrorRedirect(message: string) {
   return `${FRONTEND_URL}/github?oauth=error&message=${encodeURIComponent(message)}`;
 }
 
-// Starts GitHub OAuth for the currently logged-in Devora user.
 router.get("/github/oauth/start", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-
-    if (!OAUTH_CLIENT_ID || !OAUTH_CLIENT_SECRET) {
-      return res.status(503).json({ message: "GitHub OAuth is not configured" });
-    }
+    if (!OAUTH_CLIENT_ID || !OAUTH_CLIENT_SECRET) return res.status(503).json({ message: "GitHub OAuth is not configured" });
 
     const state = createOAuthState(userId);
     const params = new URLSearchParams({
@@ -320,58 +316,36 @@ router.get("/github/oauth/start", authenticate, async (req, res) => {
   }
 });
 
-// OAuth callback configured in the GitHub application.
 router.get("/github/callback", async (req, res) => {
   try {
     const code = typeof req.query.code === "string" ? req.query.code : "";
     const state = typeof req.query.state === "string" ? req.query.state : "";
     const githubError = typeof req.query.error === "string" ? req.query.error : "";
 
-    if (githubError) {
-      return res.redirect(oauthErrorRedirect(`GitHub authorization was ${githubError}.`));
-    }
-
-    if (!code || !state) {
-      return res.redirect(oauthErrorRedirect("Missing GitHub OAuth code or state."));
-    }
+    if (githubError) return res.redirect(oauthErrorRedirect(`GitHub authorization was ${githubError}.`));
+    if (!code || !state) return res.redirect(oauthErrorRedirect("Missing GitHub OAuth code or state."));
 
     const userId = verifyOAuthState(state);
     const oauth = await exchangeOAuthCode(code);
-    const githubUser = (await githubRequest("https://api.github.com/user", oauth.access_token)) as {
-      login?: string;
-    };
-
-    if (!githubUser.login) {
-      throw new Error("GitHub did not return a user profile");
-    }
+    const githubUser = (await githubRequest("https://api.github.com/user", oauth.access_token)) as { login?: string };
+    if (!githubUser.login) throw new Error("GitHub did not return a user profile");
 
     const credentials: StoredGitHubCredentials = {
       accessToken: oauth.access_token,
       refreshToken: oauth.refresh_token,
-      accessTokenExpiresAt: oauth.expires_in
-        ? Date.now() + oauth.expires_in * 1000
-        : undefined,
-      refreshTokenExpiresAt: oauth.refresh_token_expires_in
-        ? Date.now() + oauth.refresh_token_expires_in * 1000
-        : undefined,
+      accessTokenExpiresAt: oauth.expires_in ? Date.now() + oauth.expires_in * 1000 : undefined,
+      refreshTokenExpiresAt: oauth.refresh_token_expires_in ? Date.now() + oauth.refresh_token_expires_in * 1000 : undefined,
     };
 
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        githubTokenEnc: encrypt(serializeCredentials(credentials)),
-        githubUsername: githubUser.login,
-      },
+      data: { githubTokenEnc: encrypt(serializeCredentials(credentials)), githubUsername: githubUser.login },
     });
 
     return res.redirect(`${FRONTEND_URL}/github?oauth=connected`);
   } catch (error) {
     console.error("GitHub OAuth callback error:", error);
-    return res.redirect(
-      oauthErrorRedirect(
-        error instanceof Error ? error.message : "GitHub authorization failed.",
-      ),
-    );
+    return res.redirect(oauthErrorRedirect(error instanceof Error ? error.message : "GitHub authorization failed."));
   }
 });
 
@@ -379,16 +353,8 @@ router.get("/github/status", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { githubUsername: true, githubTokenEnc: true },
-    });
-
-    return res.json({
-      connected: Boolean(user?.githubTokenEnc),
-      username: user?.githubUsername || null,
-    });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { githubUsername: true, githubTokenEnc: true } });
+    return res.json({ connected: Boolean(user?.githubTokenEnc), username: user?.githubUsername || null });
   } catch (error) {
     console.error("GitHub status error:", error);
     return res.status(500).json({ message: "Failed to read GitHub connection status" });
@@ -399,30 +365,12 @@ router.post("/github/connect", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-
     const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
     if (!token) return res.status(400).json({ message: "GitHub token is required" });
-
-    const githubUser = (await githubRequest("https://api.github.com/user", token)) as {
-      login?: string;
-    };
-
-    if (!githubUser.login) {
-      return res.status(400).json({ message: "GitHub token is invalid" });
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        githubTokenEnc: encrypt(token),
-        githubUsername: githubUser.login,
-      },
-    });
-
-    return res.json({
-      connected: true,
-      username: githubUser.login,
-    });
+    const githubUser = (await githubRequest("https://api.github.com/user", token)) as { login?: string };
+    if (!githubUser.login) return res.status(400).json({ message: "GitHub token is invalid" });
+    await prisma.user.update({ where: { id: userId }, data: { githubTokenEnc: encrypt(token), githubUsername: githubUser.login } });
+    return res.json({ connected: true, username: githubUser.login });
   } catch (error) {
     console.error("GitHub connect error:", error);
     return res.status(400).json({ message: "Unable to connect that GitHub token" });
@@ -433,12 +381,7 @@ router.post("/github/disconnect", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { githubTokenEnc: null, githubUsername: null },
-    });
-
+    await prisma.user.update({ where: { id: userId }, data: { githubTokenEnc: null, githubUsername: null } });
     return res.json({ connected: false });
   } catch (error) {
     console.error("GitHub disconnect error:", error);
@@ -450,21 +393,13 @@ router.get("/github/repos", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-
     const token = await getConnectedToken(userId);
     if (!token) return res.status(401).json({ message: "Connect GitHub first" });
-
-    const repos = await githubRequest(
-      "https://api.github.com/user/repos?per_page=100&sort=updated",
-      token,
-    );
-
+    const repos = await githubRequest("https://api.github.com/user/repos?per_page=100&sort=updated", token);
     return res.json(repos);
   } catch (error) {
     console.error("GitHub repos error:", error);
-    return res.status(502).json({
-      message: error instanceof Error ? error.message : "Unable to load GitHub repositories",
-    });
+    return res.status(502).json({ message: error instanceof Error ? error.message : "Unable to load GitHub repositories" });
   }
 });
 
@@ -472,15 +407,10 @@ router.post("/github/import", authenticate, async (req, res) => {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     if (!userId) return res.status(401).json({ message: "Authentication required" });
-
     const { projectId, repositoryUrl } = req.body;
-    if (typeof projectId !== "string" || typeof repositoryUrl !== "string") {
-      return res.status(400).json({ message: "projectId and repositoryUrl are required" });
-    }
+    if (typeof projectId !== "string" || typeof repositoryUrl !== "string") return res.status(400).json({ message: "projectId and repositoryUrl are required" });
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, ownerId: userId },
-    });
+    const project = await prisma.project.findFirst({ where: { id: projectId, ownerId: userId } });
     if (!project) return res.status(404).json({ message: "Project not found" });
 
     const parsed = parseGitHubUrl(repositoryUrl);
@@ -488,91 +418,99 @@ router.post("/github/import", authenticate, async (req, res) => {
 
     const token = await getConnectedToken(userId);
     const apiBase = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`;
-    const repoData = (await githubRequest(apiBase, token || undefined)) as {
-      name?: string;
-      html_url?: string;
-      default_branch?: string;
-    };
+    const repoData = (await githubRequest(apiBase, token || undefined)) as { name?: string; html_url?: string; default_branch?: string };
     const defaultBranch = repoData.default_branch || "main";
 
-    const treeData = (await githubRequest(
-      `${apiBase}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`,
-      token || undefined,
-    )) as {
+    const treeData = (await githubRequest(`${apiBase}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`, token || undefined)) as {
       truncated?: boolean;
       tree?: Array<{ path: string; type: string; sha: string; size?: number }>;
     };
 
-    const blobs = (treeData.tree || []).filter(
-      (item) =>
-        item.type === "blob" &&
-        !shouldIgnorePath(item.path) &&
-        (item.size ?? 0) <= MAX_FILE_BYTES,
-    );
+    const blobs = (treeData.tree || []).filter((item) => item.type === "blob" && !shouldIgnorePath(item.path) && (item.size ?? 0) <= MAX_FILE_BYTES);
 
-    if (treeData.truncated) {
-      return res.status(413).json({
-        message: "GitHub returned a truncated repository tree. This repository is too large to import in one pass. Try a smaller repository or exclude generated folders before importing.",
-      });
-    }
-
-    if (blobs.length > MAX_FILES) {
-      return res.status(413).json({
-        message: `Repository has ${blobs.length} importable files. Devora currently supports ${MAX_FILES} files per import after excluding generated folders such as node_modules, dist, build, and coverage.`,
-      });
-    }
+    if (treeData.truncated) return res.status(413).json({ message: "GitHub returned a truncated repository tree. This repository is too large to import in one pass. Try a smaller repository or exclude generated folders before importing." });
+    if (blobs.length > MAX_FILES) return res.status(413).json({ message: `Repository has ${blobs.length} importable files. Devora currently supports ${MAX_FILES} files per import after excluding generated folders.` });
 
     let imported = 0;
     for (const item of blobs) {
-      const blob = (await githubRequest(`${apiBase}/git/blobs/${item.sha}`, token || undefined)) as {
-        encoding?: string;
-        content?: string;
-      };
+      const blob = (await githubRequest(`${apiBase}/git/blobs/${item.sha}`, token || undefined)) as { encoding?: string; content?: string };
       if (blob.encoding !== "base64" || typeof blob.content !== "string") continue;
-
       const content = Buffer.from(blob.content, "base64").toString("utf8");
       await prisma.projectFile.upsert({
         where: { projectId_path: { projectId, path: item.path } },
         update: { content },
-        create: {
-          projectId,
-          path: item.path,
-          content,
-          language: item.path.split(".").pop()?.toLowerCase() || null,
-        },
+        create: { projectId, path: item.path, content, language: item.path.split(".").pop()?.toLowerCase() || null },
       });
       imported += 1;
     }
 
-    const existing = await prisma.repository.findFirst({
-      where: { projectId, url: repoData.html_url || `https://github.com/${parsed.owner}/${parsed.repo}` },
-    });
-
+    const existing = await prisma.repository.findFirst({ where: { projectId, url: repoData.html_url || `https://github.com/${parsed.owner}/${parsed.repo}` } });
     if (!existing) {
-      await prisma.repository.create({
-        data: {
-          name: repoData.name || parsed.repo,
-          url: repoData.html_url || `https://github.com/${parsed.owner}/${parsed.repo}`,
-          provider: "github",
-          projectId,
-        },
-      });
+      await prisma.repository.create({ data: { name: repoData.name || parsed.repo, url: repoData.html_url || `https://github.com/${parsed.owner}/${parsed.repo}`, provider: "github", projectId } });
     }
 
     return res.status(201).json({
       message: "GitHub repository imported successfully",
-      repository: {
-        name: repoData.name || parsed.repo,
-        url: repoData.html_url || `https://github.com/${parsed.owner}/${parsed.repo}`,
-        branch: defaultBranch,
-      },
+      repository: { name: repoData.name || parsed.repo, url: repoData.html_url || `https://github.com/${parsed.owner}/${parsed.repo}`, branch: defaultBranch },
       filesImported: imported,
     });
   } catch (error) {
     console.error("GitHub import error:", error);
-    return res.status(502).json({
-      message: error instanceof Error ? error.message : "Unable to import the GitHub repository",
-    });
+    return res.status(502).json({ message: error instanceof Error ? error.message : "Unable to import the GitHub repository" });
+  }
+});
+
+router.post("/github/push", authenticate, async (req, res) => {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+    const { projectId, repositoryUrl, branch } = req.body;
+    if (typeof projectId !== "string" || typeof repositoryUrl !== "string") return res.status(400).json({ message: "projectId and repositoryUrl are required" });
+
+    const project = await prisma.project.findFirst({ where: { id: projectId, ownerId: userId } });
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    const token = await getConnectedToken(userId);
+    if (!token) return res.status(401).json({ message: "Connect GitHub first" });
+
+    const parsed = parseGitHubUrl(repositoryUrl);
+    if (!parsed) return res.status(400).json({ message: "Enter a valid GitHub repository URL" });
+
+    const apiBase = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`;
+    const repoData = (await githubRequest(apiBase, token)) as { default_branch?: string };
+    const targetBranch = typeof branch === "string" && branch.trim() ? branch.trim() : repoData.default_branch || "main";
+
+    const refData = (await githubRequest(`${apiBase}/git/ref/heads/${encodeURIComponent(targetBranch)}`, token)) as { object?: { sha?: string } };
+    const parentSha = refData.object?.sha;
+    if (!parentSha) return res.status(400).json({ message: "Unable to resolve the target branch" });
+
+    const commitData = (await githubRequest(`${apiBase}/git/commits/${parentSha}`, token)) as { tree?: { sha?: string } };
+    const baseTreeSha = commitData.tree?.sha;
+    if (!baseTreeSha) return res.status(400).json({ message: "Unable to resolve the target tree" });
+
+    const files = await prisma.projectFile.findMany({ where: { projectId }, orderBy: { path: "asc" } });
+    if (files.length > MAX_FILES) return res.status(413).json({ message: `Project exceeds the ${MAX_FILES}-file push limit` });
+
+    const tree: Array<{ path: string; mode: "100644"; type: "blob"; sha: string }> = [];
+    for (const file of files) {
+      if (Buffer.byteLength(file.content, "utf8") > MAX_FILE_BYTES) return res.status(413).json({ message: `File ${file.path} exceeds the ${MAX_FILE_BYTES / 1_000_000} MB limit` });
+      const blob = (await githubRequest(`${apiBase}/git/blobs`, token, { method: "POST", body: JSON.stringify({ content: Buffer.from(file.content, "utf8").toString("base64"), encoding: "base64" }) })) as { sha?: string };
+      if (!blob.sha) throw new Error(`Failed to create GitHub blob for ${file.path}`);
+      tree.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+
+    const treeData = (await githubRequest(`${apiBase}/git/trees`, token, { method: "POST", body: JSON.stringify({ base_tree: baseTreeSha, tree }) })) as { sha?: string };
+    if (!treeData.sha) return res.status(502).json({ message: "Failed to create Git tree" });
+
+    const newCommit = (await githubRequest(`${apiBase}/git/commits`, token, { method: "POST", body: JSON.stringify({ message: `Devora sync: ${project.name}`, tree: treeData.sha, parents: [parentSha] }) })) as { sha?: string; html_url?: string };
+    if (!newCommit.sha) return res.status(502).json({ message: "Failed to create Git commit" });
+
+    await githubRequest(`${apiBase}/git/refs/heads/${encodeURIComponent(targetBranch)}`, token, { method: "PATCH", body: JSON.stringify({ sha: newCommit.sha, force: false }) });
+
+    return res.json({ message: "Changes pushed to GitHub", branch: targetBranch, commitSha: newCommit.sha, commitUrl: newCommit.html_url || null, filesPushed: files.length, frontendUrl: FRONTEND_URL });
+  } catch (error) {
+    console.error("GitHub push error:", error);
+    return res.status(502).json({ message: "Unable to push changes to GitHub" });
   }
 });
 
