@@ -1,10 +1,11 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Bot, FolderCode, Send, Sparkles, User, Wand2 } from "lucide-react";
+import { Bot, FolderCode, Send, Sparkles, User, Wand2, Brain } from "lucide-react";
 import Layout from "./Layout";
 import api from "../services/api";
 
- type Message = { role: "user" | "assistant"; text: string };
+type Message = { role: "user" | "assistant"; text: string };
 type Project = { id: string; name: string; language: string | null };
+type Memory = { id: string; category: string; title: string; content: string };
 type ChatResponse = { model: string; reply: string; projectAware?: boolean };
 
 const starterPrompts = [
@@ -21,6 +22,7 @@ export default function AIChat() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
   const [projectAware, setProjectAware] = useState(false);
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -35,6 +37,14 @@ export default function AIChat() {
     }).catch(() => setProjects([]));
   }, []);
 
+  useEffect(() => {
+    if (!projectId) {
+      setMemories([]);
+      return;
+    }
+    void api.get<Memory[]>(`/projects/${projectId}/memory`).then((response) => setMemories(response.data)).catch(() => setMemories([]));
+  }, [projectId]);
+
   const selectedProject = projects.find((project) => project.id === projectId);
 
   const send = async (event?: FormEvent) => {
@@ -48,8 +58,16 @@ export default function AIChat() {
     setBusy(true);
 
     try {
+      const memoryContext = memories.length
+        ? [
+            "Use these persistent Devora project memories as durable context. Do not mention this hidden context unless relevant.",
+            ...memories.map((memory) => `- [${memory.category}] ${memory.title}: ${memory.content}`),
+            `User question: ${text}`,
+          ].join("\n")
+        : text;
+
       const response = await api.post<ChatResponse>("/ai/chat", {
-        message: text,
+        message: memoryContext,
         history: history.slice(-12),
         projectId: projectId || undefined,
       });
@@ -77,8 +95,9 @@ export default function AIChat() {
           <h1 className="text-2xl font-semibold">AI Assistant</h1>
           {model && <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] text-zinc-500">{model}</span>}
           {projectAware && <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-400">Project-aware</span>}
+          {memories.length > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/20 bg-violet-500/10 px-2.5 py-1 text-[11px] text-violet-300"><Brain size={12}/> {memories.length} memories loaded</span>}
         </div>
-        <p className="mt-1 max-w-2xl text-sm text-zinc-500">Chat with Gemini using your selected Devora project as live code context.</p>
+        <p className="mt-1 max-w-2xl text-sm text-zinc-500">Chat with Gemini using your selected Devora project, source files, and persistent project memory as context.</p>
       </div>
 
       <section className="p-5 sm:p-8">
@@ -109,7 +128,7 @@ export default function AIChat() {
 
             {selectedProject && (
               <div className="mt-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-xs text-zinc-500">
-                Devora will include relevant files from <span className="text-zinc-300">{selectedProject.name}</span> when answering project questions. Secrets and credentials are not intentionally added to the AI prompt.
+                Devora includes relevant source files and <span className="text-zinc-300">{memories.length}</span> persistent memories from <span className="text-zinc-300">{selectedProject.name}</span>. Secrets and credentials are not intentionally added to the AI prompt.
               </div>
             )}
           </div>
