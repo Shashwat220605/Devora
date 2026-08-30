@@ -36,7 +36,18 @@ api.interceptors.response.use(
 
     return response;
   },
-  (error) => Promise.reject(error),
+  (error) => {
+    if (error.response?.status === 401 && !error.config?.url?.startsWith("/auth")) {
+      localStorage.removeItem("devora_token");
+      localStorage.removeItem("devora_user");
+
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+    }
+
+    return Promise.reject(error);
+  },
 );
 
 export default api;
